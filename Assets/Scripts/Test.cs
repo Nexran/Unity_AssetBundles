@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class Test : MonoBehaviour 
 {
@@ -29,10 +30,15 @@ public class Test : MonoBehaviour
 		//	not sure will think about it more
 		for(int i = 0; i < bundles.Count; ++i)
 		{
-			GameObject prefab = bundles[i].LoadAsset<GameObject>("Player");
-			if(prefab != null)
+			string [] scenePaths = bundles[i].GetAllScenePaths();
+
+			if(scenePaths != null && scenePaths.Length > 0)
 			{
-				Instantiate(prefab);
+				string [] splits = scenePaths[0].Split('/');
+				string [] splitAgain = splits[splits.Length - 1].Split('.');
+
+				Debug.Log("Loaded Scene " + splitAgain[0]);
+				SceneManager.LoadScene(splitAgain[0], LoadSceneMode.Additive);
 			}
 		}
 	}

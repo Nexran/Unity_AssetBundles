@@ -14,6 +14,6 @@ public class CreateAssetBundles
 		}
 
 		//	build build!!
-		BuildPipeline.BuildAssetBundles("Assets/~/AssetBundles");
+		BuildPipeline.BuildAssetBundles("Assets/~/AssetBundles", BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
 	}
 }
