@@ -38,7 +38,7 @@ public class FolderModification
 			return;
 
 		//	check to see if the folder is locked
-		if(FolderLocks.Instance != null && FolderLocks.Instance.IsLockedFolder(path))
+		if(FolderLockSettings.Instance != null && FolderLockSettings.Instance.IsLockedFolder(path))
 		{
 			//	create a modified Rect that has the same width as height to make the icon square
 			GUI.DrawTexture(new Rect(selectionRect.x, selectionRect.y, selectionRect.height, selectionRect.height), _customFolderIcon);
@@ -55,11 +55,11 @@ public class FolderModification
 		string [] assetPaths = SelectionExtensions.GetAllSelectedFolderAssetPaths();
 
 		//	cycle and lock all selected folders
-		if(assetPaths != null && FolderLocks.Instance != null)
+		if(assetPaths != null && FolderLockSettings.Instance != null)
 		{
 			for(int i = 0; i < assetPaths.Length; ++i)
 			{
-				FolderLocks.Instance.LockFolder(assetPaths[i]);
+				FolderLockSettings.Instance.LockFolder(assetPaths[i]);
 			}
 		}
 	}
@@ -74,12 +74,24 @@ public class FolderModification
 		string [] assetPaths = SelectionExtensions.GetAllSelectedFolderAssetPaths();
 
 		//	cycle and unlock all selected folders
-		if(assetPaths != null && FolderLocks.Instance != null)
+		if(assetPaths != null && FolderLockSettings.Instance != null)
 		{
 			for(int i = 0; i < assetPaths.Length; ++i)
 			{
-				FolderLocks.Instance.UnlockFolder(assetPaths[i]);
+				FolderLockSettings.Instance.UnlockFolder(assetPaths[i]);
 			}
+		}
+	}
+
+	/// <summary>
+	/// Clears all locks on every folder.
+	/// </summary>
+	[MenuItem("Assets/Lock/Remove All")]
+	public static void ClearLocks()
+	{
+		if(FolderLockSettings.Instance != null)
+		{
+			FolderLockSettings.Instance.ClearLocks();
 		}
 	}
 }

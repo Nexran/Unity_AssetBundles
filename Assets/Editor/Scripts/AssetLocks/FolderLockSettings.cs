@@ -4,26 +4,27 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Folder Locks is used to determine which folders are locked and should not be modified acts as the data for folder locks.
+/// Folder Locks Settings is used to determine which folders are locked and should not be modified acts as the data for folder locks.
 /// </summary>
 [CreateAssetMenu()]
-public class FolderLocks : ScriptableObject
+public class FolderLockSettings : ScriptableObject
 {
-	private const string FolderLockAssetName = "Folder Lock List";
-	private const string FolderLockPath = "Editor/Resources";
+	private const string FolderLockSettingsName = "Folder Lock Settings";
+	private const string EditorResourcesPath = "Editor/Resources";
 	private const string AssetExtension = ".asset";
-	private const string Assets = "Assets";
+	private const string Assets = "Assets/";
 
 	[SerializeField]
+	[DelayedAttribute()]
 	private List<string> _lockedFolders;
 
-	private static FolderLocks _instance;
+	private static FolderLockSettings _instance;
 
 	/// <summary>
 	/// Gets the instance of Folder Locks. 
 	/// </summary>
 	/// <value>The instance!</value>
-	public static FolderLocks Instance
+	public static FolderLockSettings Instance
 	{
 		get
 		{
@@ -31,19 +32,19 @@ public class FolderLocks : ScriptableObject
 			{
 				//	attempt to load the Resource
 				//	Resources.Load will auto poll any folder named Resources in the project hierarchy
-				//	this is why the FolderLockPath is set to Resources 
-				_instance = Resources.Load(FolderLockAssetName) as FolderLocks;
+				//	this is why the EditorResourcesPath is set to Resources 
+				_instance = Resources.Load(FolderLockSettingsName) as FolderLockSettings;
 				if(_instance == null)
 				{
 					// If not found, autocreate the asset object.
-					_instance = ScriptableObject.CreateInstance<FolderLocks>();
+					_instance = ScriptableObject.CreateInstance<FolderLockSettings>();
 
 					//	if directory doesn't exist create it
-					string properPath = Path.Combine(Application.dataPath, FolderLockPath);
+					string properPath = Path.Combine(Application.dataPath, EditorResourcesPath);
 					if(!Directory.Exists(properPath)) {	Directory.CreateDirectory(properPath); }
 
 					//	create asset at the directory path
-					string fullPath = Path.Combine(Assets + FolderLockPath, FolderLockAssetName + AssetExtension);
+					string fullPath = Path.Combine(Assets + EditorResourcesPath, FolderLockSettingsName + AssetExtension);
 					AssetDatabase.CreateAsset(_instance, fullPath);
 				}
 			}
@@ -61,7 +62,7 @@ public class FolderLocks : ScriptableObject
 		bool isLocked = false;
 		//	validation and make sure you never lock the file for the locks!
 		//	cycle through all locked folders and see if they contain any of the passed in asset path
-		if(_lockedFolders != null && !assetPath.Contains(FolderLockAssetName))
+		if(_lockedFolders != null && !assetPath.Contains(FolderLockSettingsName))
 		{
 			for(int i = 0; i < _lockedFolders.Count; ++i)
 			{
@@ -83,6 +84,7 @@ public class FolderLocks : ScriptableObject
 	public bool LockFolder(string path)
 	{
 		bool locked = false;
+
 		//	make sure its valid and not already locked
 		if(_lockedFolders != null && _lockedFolders.Contains(path) == false)
 		{
@@ -107,5 +109,16 @@ public class FolderLocks : ScriptableObject
 			unlocked = true;
 		}
 		return unlocked;
+	}
+
+	/// <summary>
+	/// Clears all locks.
+	/// </summary>
+	public void ClearLocks()
+	{
+		if(_lockedFolders != null)
+		{
+			_lockedFolders.Clear();
+		}
 	}
 }

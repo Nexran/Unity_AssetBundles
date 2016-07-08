@@ -8,16 +8,21 @@ public class AssetBundleLabels
 	[MenuItem("Custom/BundleName")]
 	private static void SetAssetBundleName()
 	{
+		Debug.Log(AssetLabelSettings.Instance.name);
+
 		string [] assetPaths = SelectionExtensions.GetAllSelectedAssetPaths();
 
-		for(int j = 0; j < assetPaths.Length; ++j)
+		if(assetPaths != null)
 		{
-			AssetImporter assetImporter = AssetImporter.GetAtPath(assetPaths[j]);
-			assetImporter.assetBundleName = "myLevel";
-			assetImporter.assetBundleVariant = "x2";
-			assetImporter.SaveAndReimport();
+			for(int j = 0; j < assetPaths.Length; ++j)
+			{
+				AssetImporter assetImporter = AssetImporter.GetAtPath(assetPaths[j]);
+				assetImporter.assetBundleName = "myLevel";
+				assetImporter.assetBundleVariant = "x2";
+				assetImporter.SaveAndReimport();
 
-			Debug.Log(assetPaths[j]);
+				Debug.Log(assetPaths[j]);
+			}
 		}
 
 	//	for(int i = 0; i < selectedObjects.Length; ++i)	

@@ -19,7 +19,7 @@ public class AssetModification : UnityEditor.AssetModificationProcessor
 		//	we cycle through and ensure no assets are currently locked.
 		for(int i = 0; i < paths.Length; ++i)
 		{
-			if(FolderLocks.Instance != null && !FolderLocks.Instance.IsLockedFolder(paths[i]))
+			if(FolderLockSettings.Instance != null && !FolderLockSettings.Instance.IsLockedFolder(paths[i]))
 			{
 				assetsToSave.Add(paths[i]);
 			}
@@ -39,7 +39,7 @@ public class AssetModification : UnityEditor.AssetModificationProcessor
 	private static AssetDeleteResult OnWillDeleteAsset(string path, RemoveAssetOptions option) 
 	{
 		AssetDeleteResult assetDeleteResult = AssetDeleteResult.DidNotDelete;
-		if(FolderLocks.Instance != null && FolderLocks.Instance.IsLockedFolder(path))
+		if(FolderLockSettings.Instance != null && FolderLockSettings.Instance.IsLockedFolder(path))
 		{
 			assetDeleteResult = AssetDeleteResult.FailedDelete;
 		}
@@ -54,7 +54,9 @@ public class AssetModification : UnityEditor.AssetModificationProcessor
 	private static AssetMoveResult OnWillMoveAsset(string oldPath, string newPath) 
 	{
 		AssetMoveResult assetMoveResult = AssetMoveResult.DidNotMove;
-		if(FolderLocks.Instance != null && FolderLocks.Instance.IsLockedFolder(oldPath) && FolderLocks.Instance.IsLockedFolder(newPath))
+		if(FolderLockSettings.Instance != null 
+			&& FolderLockSettings.Instance.IsLockedFolder(oldPath)
+			&& FolderLockSettings.Instance.IsLockedFolder(newPath))
 		{
 			assetMoveResult = AssetMoveResult.FailedMove;
 		}
@@ -74,7 +76,7 @@ public class AssetModification : UnityEditor.AssetModificationProcessor
 		msg = string.Empty;
 
 		bool edit = true;
-		if(FolderLocks.Instance != null && FolderLocks.Instance.IsLockedFolder(assetPath))
+		if(FolderLockSettings.Instance != null && FolderLockSettings.Instance.IsLockedFolder(assetPath))
 		{
 			edit = false;
 		}
