@@ -21,6 +21,16 @@ public class FolderLockSettings : ScriptableObject
 	private static FolderLockSettings _instance;
 
 	/// <summary>
+	/// Gets all folders that have locks on them.
+	/// </summary>
+	/// <value>The locked folders.</value>
+	public List<string> LockedFolders 
+	{ 
+		get { return _lockedFolders; } 
+		private set { _lockedFolders = value; }
+	}
+
+	/// <summary>
 	/// Gets the instance of Folder Locks. 
 	/// </summary>
 	/// <value>The instance!</value>

@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class AssetModification : UnityEditor.AssetModificationProcessor
 {
+	//	asset modification requires a team license
+	//	no clue what is going to happen to this with the Unity pricing model
+	#if UNITY_PRO
 	/// <summary>
 	/// Unity method called whenever an asset save is attempted. 
 	/// </summary>
@@ -82,4 +85,5 @@ public class AssetModification : UnityEditor.AssetModificationProcessor
 		}
 		return edit;
 	}
+	#endif
 }
