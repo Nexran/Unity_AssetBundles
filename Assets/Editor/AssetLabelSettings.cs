@@ -5,7 +5,7 @@ using UnityEngine;
 [CreateAssetMenu()]
 public class AssetLabelSettings : ScriptableObject
 {
-	private const string AssetLabelSettingsName = "Asset Label Settings";
+	public const string AssetLabelSettingsName = "Asset Label Settings";
 	private const string EditorResourcesPath = "Editor/Resources";
 	private const string AssetExtension = ".asset";
 	private const string Assets = "Assets/";
@@ -66,6 +66,11 @@ public class AssetLabelSettings : ScriptableObject
 	private string ProjectPath 
 	{
 		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6); }
+	}
+
+	private Object AssetLabelSettingsObject
+	{
+		get { return Resources.Load(AssetLabelSettingsName); }
 	}
 
 	/// <summary>
@@ -159,5 +164,13 @@ public class AssetLabelSettings : ScriptableObject
 		}
 
 		return variant;
+	}
+		
+	[MenuItem("Custom/Asset Bundles/View Asset Bundle Settings", false, 1)]
+	private static void ViewAssetBundleSettings()
+	{
+		Object resource = Resources.Load(AssetLabelSettingsName);
+		if(resource == null) { resource = Instance.AssetLabelSettingsObject; }
+		Selection.activeObject = resource;
 	}
 }
