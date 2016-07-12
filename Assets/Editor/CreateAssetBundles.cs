@@ -7,13 +7,22 @@ public class CreateAssetBundles
 	[MenuItem ("Custom/Build AssetBundles")]
 	private static void BuildAllAssetBundles()
 	{
-		//	we create the directory if we doesn't exist
-		if(Directory.Exists(Application.dataPath + "/~/AssetBundles") == false)
+		string assetBundleDirectory = string.Empty;
+		if(AssetLabelSettings.Instance != null)
 		{
-			Directory.CreateDirectory(Application.dataPath + "/~/AssetBundles");
+			assetBundleDirectory = AssetLabelSettings.Instance.AssetBundleDirectory;
 		}
 
-		//	build build!!
-		BuildPipeline.BuildAssetBundles("Assets/~/AssetBundles", BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
+		if(!string.IsNullOrEmpty(assetBundleDirectory))
+		{
+			//	we create the directory if we doesn't exist
+			if(Directory.Exists(assetBundleDirectory) == false)
+			{
+				Directory.CreateDirectory(assetBundleDirectory);
+			}	
+
+			//	build build!!
+			BuildPipeline.BuildAssetBundles(assetBundleDirectory, BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
+		}
 	}
 }

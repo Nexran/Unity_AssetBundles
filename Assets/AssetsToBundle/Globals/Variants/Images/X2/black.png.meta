@@ -53,5 +53,5 @@ TextureImporter:
     outline: []
   spritePackingTag: 
   userData: 
-  assetBundleName: textures
-  assetBundleVariant: 
+  assetBundleName: globals/variants/images
+  assetBundleVariant: x2
