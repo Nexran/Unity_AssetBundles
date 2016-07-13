@@ -1,0 +1,20 @@
+ManifestFileVersion: 0
+CRC: 211797583
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 7ddb5b369b2fd2d4c2618ff28d6d08af
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 9dea23ffc7e96552740e12d1ee5309d8
+HashAppended: 0
+ClassTypes:
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 213
+  Script: {instanceID: 0}
+Assets:
+- Assets/AssetsToBundle/Globals/Variants/Images/X2/black.png
+- Assets/AssetsToBundle/Globals/Variants/Images/X2/sheet.png
+- Assets/AssetsToBundle/Globals/Variants/Images/X2/white.png
+Dependencies: []

@@ -1,0 +1,18 @@
+ManifestFileVersion: 0
+CRC: 3172691937
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: globals/prefabs/characters
+      Dependencies:
+        Dependency_0: globals/variants/images.x2
+    Info_1:
+      Name: globals/scenes
+      Dependencies:
+        Dependency_0: globals/prefabs/characters
+    Info_2:
+      Name: globals/variants/images.x2
+      Dependencies: {}
+    Info_3:
+      Name: globals/variants/images.x1
+      Dependencies: {}

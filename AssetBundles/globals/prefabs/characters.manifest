@@ -1,0 +1,27 @@
+ManifestFileVersion: 0
+CRC: 3974526945
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 4152cff4893a32955b0206703669d5f5
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 59115a64cf1835f9b870e5b819903277
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 212
+  Script: {instanceID: 0}
+- Class: 213
+  Script: {instanceID: 0}
+Assets:
+- Assets/AssetsToBundle/Globals/Prefabs/Characters/Player.prefab
+Dependencies:
+- /Users/carr/Unity_AssetBundles/AssetBundles/globals/variants/images.x2
