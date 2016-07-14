@@ -202,7 +202,7 @@ public class AssetBundleEditor
 		string path = assetPath.Substring(AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + 1);
 
 		//	split out the remaining string Globals/Prefabs/Characters/this.jpg to an array so we can truncate out the object this.jpg
-		string [] splitPath = path.Split(Path.AltDirectorySeparatorChar);
+		string [] splitPath = path.Split(Path.DirectorySeparatorChar);
 
 		string newPath = string.Empty;
 		//	we make sure the for loop will never add in the last part of the array the object this.jpg
@@ -215,7 +215,7 @@ public class AssetBundleEditor
 			}
 
 			//	add back the slashes, we skip adding the slash on the first pass
-			if(j != 0) newPath += Path.AltDirectorySeparatorChar;
+			if(j != 0) newPath += Path.DirectorySeparatorChar;
 
 			//	make sure all paths are lower case
 			newPath += splitPath[j].ToLower();
@@ -245,7 +245,7 @@ public class AssetBundleEditor
 				continue;
 
 			oldPaths.Add(files[i].FullName.Substring(LenghtOfProjectPath));
-			newPaths.Add(newDirectory.Substring(LenghtOfProjectPath) + Path.AltDirectorySeparatorChar + files[i].Name);
+			newPaths.Add(newDirectory.Substring(LenghtOfProjectPath) + Path.DirectorySeparatorChar + files[i].Name);
 		}
 
 		//	loop through every path to see if we need to copy any assets from the old location
