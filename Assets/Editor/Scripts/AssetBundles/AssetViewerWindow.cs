@@ -79,16 +79,16 @@ public class AssetViewerWindow : EditorWindow
 		_selectionTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
 		_dividerTexture = EditorGUIUtility.Load(_dividerTextureName) as Texture;
 		_folderTexture = AssetDatabase.GetCachedIcon("Assets") as Texture2D;//EditorGUIUtility.Load(_folderTextureName) as Texture2D;
+
+		resize = false;
+		currentScrollViewWidth = this.position.width / 2;
+		cursorChangeRect = new Rect(currentScrollViewWidth, 0, 2f, this.position.height);
 	}
 
 	public void OnFocus()
 	{
 		if(AssetBundleSettings.Instance == null)
 			return;
-
-		resize = false;
-		currentScrollViewWidth = this.position.width / 2;
-		cursorChangeRect = new Rect(currentScrollViewWidth, 0, 2f, this.position.height);
 
 		//	get all Files that are under the main Asset TO Bundle directory 
 		DirectoryInfo directory = new DirectoryInfo(AssetBundleSettings.Instance.AssetsToBundleDirectory);
@@ -121,7 +121,7 @@ public class AssetViewerWindow : EditorWindow
 
 			importDirectory.indentLevel = importDirectory.dir.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
 			importDirectory.subDirectories = dir.GetDirectories("*", SearchOption.TopDirectoryOnly);
-			importDirectory.files = dir.GetFiles("*", SearchOption.TopDirectoryOnly).Where(o => !o.Name.EndsWith(".meta")).ToArray();
+			importDirectory.files = dir.GetFiles("*", SearchOption.TopDirectoryOnly).Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
 
 			if(importDirectory.subDirectories.Length == 0)
 			{
@@ -139,11 +139,20 @@ public class AssetViewerWindow : EditorWindow
 				}
 			}
 
-			//	if the directory is already added don't add it
-			if(!_directories.Any(o => o.expandedDirName == importDirectory.expandedDirName))
+			int index = _directories.FindIndex(o => o.expandedDirName.Equals(importDirectory.expandedDirName));
+			if(index == -1)
 			{
 				Debug.Log("ADD " + importDirectory.expandedDirName + importDirectory.expanded);
 				_directories.Add(importDirectory);
+			}
+			else
+			{
+				Debug.Log("REPLACE " + index + " ");
+				Debug.Log("OLD " + _directories[index].expandedDirName +  " " + _directories[index].expanded);
+				Debug.Log("NEW " + importDirectory.expandedDirName + " " + importDirectory.expanded);
+
+				_directories.RemoveAt(index);
+				_directories.Insert(index, importDirectory);
 			}
 		}
 
@@ -151,7 +160,7 @@ public class AssetViewerWindow : EditorWindow
 		//	this will get all the directories in a correct visible order
 		_directories.Sort((x, y) =>
 		{
-			return x.dir.FullName.CompareTo(y.dir.FullName);
+			return x.expandedDirName.CompareTo(y.expandedDirName);
 		});	
 	}
 
@@ -173,7 +182,10 @@ public class AssetViewerWindow : EditorWindow
 
 		if(_directories != null)
 		{
-			UpdateExpandedDirectories();
+			if(Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout)
+			{
+				UpdateExpandedDirectories();
+			}
 
 			for(int i = 0; i < _directories.Count; ++i)
 			{
@@ -187,11 +199,11 @@ public class AssetViewerWindow : EditorWindow
 
 						if(_directories[i].subDirectories.Length == 0)
 						{
-							EditorGUILayout.LabelField(string.Format("       {0}", _directories[i].dir.Name));
+							EditorGUILayout.LabelField(string.Format("          {0}", _directories[i].dir.Name));
 						}
 						else
 						{
-							_directories[i].expanded = EditorGUILayout.Foldout(_directories[i].expanded, string.Format("    {0}", _directories[i].dir.Name));
+							_directories[i].expanded = EditorGUILayout.Foldout(_directories[i].expanded, string.Format("      {0}", _directories[i].dir.Name));
 						}
 						Rect r = GUILayoutUtility.GetLastRect();
 
@@ -231,14 +243,14 @@ public class AssetViewerWindow : EditorWindow
 				{
 					for(int j = 0; j < _directories[i].subDirectories.Length; ++j)
 					{
-						EditorGUILayout.LabelField(string.Format("    {0}", _directories[i].subDirectories[j].Name));
+						EditorGUILayout.LabelField(string.Format("     {0}", _directories[i].subDirectories[j].Name));
 						Rect r = GUILayoutUtility.GetLastRect();
 						if(_folderTexture != null) GUI.DrawTexture(new Rect(r.x, r.y, 16, 16), _folderTexture);
 					}
 
 					for(int j = 0; j < _directories[i].files.Length; ++j)
 					{
-						EditorGUILayout.LabelField(string.Format("    {0}", _directories[i].files[j].Name));
+						EditorGUILayout.LabelField(string.Format("     {0}", _directories[i].files[j].Name));
 						Rect r = GUILayoutUtility.GetLastRect();
 
 						string fileLocation = _directories[i].files[j].FullName.Substring(LenghtOfProjectPath);
@@ -321,7 +333,9 @@ public class AssetViewerWindow : EditorWindow
 						string newPath = _directories[i].dir.FullName.Replace("~", string.Empty);
 
 						_directories[i].dir.MoveTo(newPath);
-						_directories[i].dir = new DirectoryInfo(newPath);
+						//_directories[i].dir = new DirectoryInfo(newPath);
+
+						OnFocus();
 					}
 				}
 			}
@@ -337,10 +351,17 @@ public class AssetViewerWindow : EditorWindow
 			{
 				if(_removedDirectories[j] == _directories[i].expandedParentName )
 				{
-					Debug.Log("CLOSED " + i + " " + _directories[i].expandedDirName);
 					string newPath = _directories[i].dir.FullName + "~";
-					_directories[i].dir.MoveTo(newPath);
-					_directories[i].dir = new DirectoryInfo(newPath);
+					bool exists = Directory.Exists(newPath);
+					Debug.Log("CLOSED " + i + " " + _directories[i].expandedDirName + " " + exists);
+
+					if(exists == false)
+					{
+						_directories[i].dir.MoveTo(newPath);
+						//_directories[i].dir = new DirectoryInfo(newPath);
+						OnFocus();
+
+					}
 					_directories[i].expanded = false;
 				}
 			}
