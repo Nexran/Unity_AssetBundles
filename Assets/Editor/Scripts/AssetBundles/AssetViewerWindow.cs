@@ -3,233 +3,280 @@ using System.Collections.Generic;
 using UnityEditor;
 using System.IO;
 using System.Linq;
-
-public class ImportDirectory
-{
-	public DirectoryInfo parentDir { get; set; }
-	public DirectoryInfo dir { get; set; }
-
-	public DirectoryInfo [] subDirectories { get; set; }
-
-	public FileInfo [] files { get; set; }
-
-	public string displayName { get; set; }
-
-	public string expandedDirName { get; set; } 
-	public string expandedParentName { get; set; }
-
-	public bool expanded { get; set; }
-	public int indentLevel { get; set; } 
-	public bool selected { get; set; }
-	public Rect controlRect { get; set; }
-	public bool setRect { get; set; }
-
-	public ImportDirectory()
-	{
-		expanded = false;
-		setRect = true;
-	}
-}
 	
+/// <summary>
+/// Asset viewer window, shows all directories that are listed under the Asset To Bundle Directory set in Asset Bundle Settings.
+/// </summary>
 public class AssetViewerWindow : EditorWindow
 {
-	/// <summary>
-	///	calculate the start index to get the length of the project path
-	///	this is used to get where in the local project Asset folder the path is
-	/// </summary>
-	/// <value>The lenght of project path.</value>
-	private static int LenghtOfProjectPath
-	{
-		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
-	}
-
 	private static string _windowName = "Asset Viewer";
 	private static string _selectionTextureName = "opacity.png";
-	private static string _dividerTextureName = "Test.png";
+	private static string _defaultFolderName = "Assets";
+	private static float _dividerWidth = 2f;
+	private static char _smallRightArrowUnicode = '\u25B8';
+	private static float _folderXOffset = 17f;
+	private static string _noFilesOrSubDir = "This folder is empty";
 
 	private static Texture _selectionTexture;
 	private static Texture _dividerTexture;
 	private static Texture2D _folderTexture;
 
-	private List<ImportDirectory> _directories = new List<ImportDirectory>();
-	private List<string> _expandedDirectories = new List<string>();
-	private List<string> _removedDirectories= new List<string>();
-	private List<string> _openedDirectories = new List<string>();
+	private List<AssetViewerDirectory> _viewerDirectories;
+	private List<string> _expandedDirectories;
+	private List<string> _removedDirectories;
+	private List<string> _openedDirectories;
 
-	private Vector2 _scroll;
+	private Vector2 _leftScroll;
 	private Vector2 _rightScroll;
 
-	private float currentScrollViewWidth;
-	private bool resize;
-	private Rect cursorChangeRect;
+	private float _currentViewWidth;
+	private bool _isResizing;
+	private Rect _dividerRect;
 
 	private Rect _selectionRect;
 	private string _directoryDisplayName;
 
+	/// <summary>
+	/// Shows the window.
+	/// </summary>
 	[MenuItem("Custom/Asset Viewer")]
 	public static void ShowWindow()
 	{
 		GetWindow<AssetViewerWindow>(_windowName);
 	}
 
+	/// <summary>
+	/// Unity function OnEnable, called when the window gets initialized. 
+	/// </summary>
 	public void OnEnable()
 	{
 		//	this searches in the default folder Editor Default Resources for the texture
 		_selectionTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
-		_dividerTexture = EditorGUIUtility.Load(_dividerTextureName) as Texture;
-		_folderTexture = AssetDatabase.GetCachedIcon("Assets") as Texture2D;//EditorGUIUtility.Load(_folderTextureName) as Texture2D;
+		_dividerTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
+		_folderTexture = AssetDatabase.GetCachedIcon(_defaultFolderName) as Texture2D;
+
+		_viewerDirectories = new List<AssetViewerDirectory>();
+		_expandedDirectories = new List<string>();
+		_removedDirectories= new List<string>();
+		_openedDirectories = new List<string>();
 	}
 
+	/// <summary>
+	/// Unity function OnFocus, Called when the window gets keyboard focus.
+	/// </summary>
 	public void OnFocus()
+	{
+		if(AssetBundleSettings.Instance == null || string.IsNullOrEmpty(AssetBundleSettings.Instance.AssetsToBundleDirectory))
+			return;
+			
+		//	initialize the Directory Display Name
+		_directoryDisplayName = AssetBundleSettings.Instance.AssetsToBundleDirectory;
+		_directoryDisplayName = _directoryDisplayName.Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
+
+		InitViewerWindow();
+	}
+
+	/// <summary>
+	/// Unity function OnGUI, might be called several times per frame (one call per event). 
+	/// </summary>
+	public void OnGUI()
 	{
 		if(AssetBundleSettings.Instance == null)
 			return;
 
-		resize = false;
-		currentScrollViewWidth = this.position.width / 2;
-		cursorChangeRect = new Rect(currentScrollViewWidth, 0, 2f, this.position.height);
+		//	calculate mouse position before any other part due to other logic potentially 
+		//	altering the mouse position and setting the Event.current.type to USED instead of Mouse Down
+		//	mouse position being null means the mouse wasn't pressed down
+		Vector2? _mousePosition = null;
+		if(Event.current.type == EventType.MouseDown)
+		{
+			//	adjust for if the user has scrolled the view down the page
+			_mousePosition = Event.current.mousePosition + _leftScroll;
+		}
+		//	only update directories when the Event is either Repaint or Layout so it doesn't change while calculating what to render
+		else if(Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout)
+		{
+			if(_viewerDirectories != null) { UpdateViewerDirectories(); }
+		}
+
+		GUILayout.BeginHorizontal();
+
+		//	render the left side of the screen
+		RenderViewerDirectories();
+	
+		//	render the divider used to click and reposition the size of the 2 halves of the screen
+		RenderDivider();
+
+		//	render the right side of the screen
+		RenderFolderView();
+
+		GUILayout.EndHorizontal();
+
+		Vector2? _rightMousePosition = null;
+
+		if(_mousePosition.HasValue)
+		{
+			_rightMousePosition = new Vector2?(new Vector2(_mousePosition.Value.x + _currentViewWidth, _mousePosition.Value.y));
+		}
+
+		if(_rightMousePosition.HasValue)
+		{
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
+			{
+				if(_viewerDirectories[i].IsSelected == true && _viewerDirectories[i].FileRects != null)
+				{
+					Debug.Log(_viewerDirectories[i].FileRects.Count + " " + _mousePosition.Value);
+					for(int j = 0; j < _viewerDirectories[i].FileRects.Count; ++j)
+					{
+						Debug.Log(_viewerDirectories[i].FileRects[j]);
+
+						if(_viewerDirectories[i].FileRects[j].Contains(_mousePosition.Value))
+						{
+							Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
+							if(obj != null) { Selection.activeObject = obj; }
+						}
+					}
+				}
+			}
+		}
+
+		//	cycle through all directories and check to see if a directory has been clicked on
+		for(int i = 0; i < _viewerDirectories.Count; ++i)
+		{
+			if(_mousePosition.HasValue)
+			{
+				if(_viewerDirectories[i].SelectionRect.Contains(_mousePosition.Value))
+				{
+					//	if we switch one to true lets reset all others to false
+					for(int j = 0; j < _viewerDirectories.Count; ++j)
+					{
+						_viewerDirectories[j].IsSelected = false;
+					}
+
+					//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
+					Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].ProjectPathFolderLocation, typeof(Object));
+					if(obj != null) { Selection.activeObject = obj; }
+					_viewerDirectories[i].IsSelected = true;
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// Unity function OnInspectorUpdate is called at 10 frames per second to give the inspector a chance to update.
+	/// Unity recommends all Repaints to occur in this.
+	/// </summary>
+	public void OnInspectorUpdate() 
+	{
+		Repaint();
+		AssetDatabase.Refresh();
+	}
+
+	/// <summary>
+	/// Inits the viewer window, and sets up all the AssetViewerDirectories to show.
+	/// </summary>
+	private void InitViewerWindow()
+	{
+		//	set up Divider rect 
+		_isResizing = false;
+		_currentViewWidth = this.position.width / 2;
+		_dividerRect = new Rect(_currentViewWidth, 0, _dividerWidth, this.position.height);
 
 		//	get all Files that are under the main Asset TO Bundle directory 
 		DirectoryInfo directory = new DirectoryInfo(AssetBundleSettings.Instance.AssetsToBundleDirectory);
 		DirectoryInfo [] dirs = directory.GetDirectories("*", SearchOption.AllDirectories);
-
-		_directoryDisplayName = AssetBundleSettings.Instance.AssetsToBundleDirectory;
-		_directoryDisplayName = _directoryDisplayName.Replace(Path.DirectorySeparatorChar, '\u25B8');
 
 		//	we always want the main directory expanded
 		if(_expandedDirectories.Count == 0)
 		{
 			_expandedDirectories.Add(directory.FullName);
 		}
-		int baseIndentCount = directory.FullName.Split(Path.DirectorySeparatorChar).Length;
+		int baseIndentCount = directory.FullName.Split(Path.DirectorySeparatorChar).Length + 1;
 
+		//	cycle through all directories and create the custom viewer directory
+		//	only add a new directory to the list if it has been modified
+		//	we check to see if its been modified based on its directory name
 		for(int i = 0; i < dirs.Length; ++i)
 		{
-			ImportDirectory importDirectory = new ImportDirectory();
+			AssetViewerDirectory viewerDirectory = new AssetViewerDirectory(dirs[i], baseIndentCount);
 
-			importDirectory.parentDir = dirs[i].Parent;
-			importDirectory.dir = dirs[i];
-
-			importDirectory.expandedDirName = dirs[i].FullName;
-			importDirectory.expandedParentName = dirs[i].Parent.FullName;
-			if(importDirectory.expandedDirName.Contains("~"))
-			{
-				importDirectory.expandedDirName = importDirectory.expandedDirName.Replace("~", string.Empty);
-			}
-			if(importDirectory.expandedParentName.Contains("~"))
-			{
-				importDirectory.expandedParentName = importDirectory.expandedParentName.Replace("~", string.Empty);
-			}
-			importDirectory.displayName = importDirectory.expandedDirName.Substring(LenghtOfProjectPath);
-			importDirectory.displayName = importDirectory.displayName.Replace(Path.DirectorySeparatorChar, '\u25B8');
-
-			importDirectory.indentLevel = importDirectory.dir.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
-			importDirectory.subDirectories = dirs[i].GetDirectories("*", SearchOption.TopDirectoryOnly);
-			importDirectory.files = dirs[i].GetFiles("*", SearchOption.TopDirectoryOnly).Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
-
-			if(importDirectory.subDirectories.Length == 0)
-			{
-				importDirectory.expanded = false;
-			}
-			else
-			{
-				if(!importDirectory.subDirectories.Any(o => o.FullName.Contains("~")))
-				{
-					importDirectory.expanded = true;
-				}
-				else
-				{
-					importDirectory.expanded = false;
-				}
-			}
-
-			int index = _directories.FindIndex(o => o.expandedDirName.Equals(importDirectory.expandedDirName));
+			//	if the name has changed it means we need to update it in the list
+			int index = _viewerDirectories.FindIndex(o => o.ExpandedDirectoryName.Equals(viewerDirectory.ExpandedDirectoryName));
 			if(index == -1)
 			{
-			//	Debug.Log("ADD " + importDirectory.expandedDirName + importDirectory.expanded);
-				_directories.Add(importDirectory);
+				_viewerDirectories.Add(viewerDirectory);
 			}
 			else
 			{
-			//	Debug.Log("REPLACE " + index + " ");
-			//	Debug.Log("OLD " + _directories[index].expandedDirName +  " " + _directories[index].expanded);
-			//	Debug.Log("NEW " + importDirectory.expandedDirName + " " + importDirectory.expanded);
-
-				_directories.RemoveAt(index);
-				_directories.Insert(index, importDirectory);
+				_viewerDirectories.RemoveAt(index);
+				_viewerDirectories.Insert(index, viewerDirectory);
 			}
 		}
 
 		//	sort based on the directory name 
 		//	this will get all the directories in a correct visible order
-		_directories.Sort((x, y) =>
+		_viewerDirectories.Sort((x, y) =>
 		{
-			return x.expandedDirName.CompareTo(y.expandedDirName);
+			return x.ExpandedDirectoryName.CompareTo(y.ExpandedDirectoryName);
 		});	
 	}
 
-	public void OnGUI()
+	/// <summary>
+	/// Renders the viewer directories, for the left side of the screen.
+	/// </summary>
+	private void RenderViewerDirectories()
 	{
-		if(AssetBundleSettings.Instance == null)
-			return;
+		_leftScroll = GUILayout.BeginScrollView(_leftScroll, false, false, GUILayout.Width(_currentViewWidth));
 
-		Vector2? _mousePosition = null;
-
-		if(Event.current.type == EventType.MouseDown)
+		if(_viewerDirectories != null)
 		{
-			_mousePosition = Event.current.mousePosition;
-		}
-
-		GUILayout.BeginHorizontal();
-
-		_scroll = GUILayout.BeginScrollView(_scroll, false, false, GUILayout.Width(currentScrollViewWidth));
-
-		if(_directories != null)
-		{
-			if(Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout)
-			{
-				UpdateExpandedDirectories();
-			}
-
+			//	render the label at the top, with a selection texture behind it
+			//	for examples Assets->AssetsToBundle
 			EditorGUILayout.LabelField(_directoryDisplayName, EditorStyles.boldLabel);
-			Rect lastRect = GUILayoutUtility.GetLastRect();
-			if(_selectionTexture != null) GUI.DrawTexture(lastRect, _selectionTexture);
+			if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
 
-			for(int i = 0; i < _directories.Count; ++i)
+			//	cycle through all directories 
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				EditorGUI.indentLevel = _directories[i].indentLevel;
+				EditorGUI.indentLevel = _viewerDirectories[i].IndentLevel;
 
+				//	now we check all expanded directories if its expanded we show it!
 				for(int j = 0; j < _expandedDirectories.Count; ++j)
 				{
-					if(_directories[i].expandedParentName == _expandedDirectories[j])
+					if(_viewerDirectories[i].ExpandedParentName == _expandedDirectories[j])
 					{
 						GUILayout.BeginHorizontal();
 
-						if(_directories[i].subDirectories.Length == 0)
+						//	show a foldout if the directory has sub directories
+						//	we add in extra spaces for the folder to be placed inbetween
+						if(_viewerDirectories[i].SubDirectories.Length == 0)
 						{
-							EditorGUILayout.LabelField(string.Format("          {0}", _directories[i].dir.Name));
+							EditorGUILayout.LabelField(string.Format("          {0}", _viewerDirectories[i].Directory.Name));
 						}
 						else
 						{
-							_directories[i].expanded = EditorGUILayout.Foldout(_directories[i].expanded, string.Format("      {0}", _directories[i].dir.Name));
+							_viewerDirectories[i].IsExpanded = EditorGUILayout.Foldout(_viewerDirectories[i].IsExpanded,
+								string.Format("      {0}", _viewerDirectories[i].Directory.Name));
 						}
-						Rect r = GUILayoutUtility.GetLastRect();
 
-						if(_directories[i].setRect == true && r.width > 10f)
+						Rect lastRect = GUILayoutUtility.GetLastRect();
+						//	TODO look into a better way to set these rects
+						if(Event.current.type == EventType.MouseDown) 
 						{
-							_directories[i].controlRect = new Rect(0, r.y, r.width + r.x, r.height);
-							_directories[i].setRect = false;
+							_viewerDirectories[i].SelectionRect = new Rect(0, lastRect.y, lastRect.width + lastRect.x, lastRect.height);
 						}
 
-						Rect a = EditorGUI.IndentedRect(r);
-						float x = (a.x - r.x) + 17f;
-						if(_folderTexture != null)	GUI.DrawTexture(new Rect(x, r.y, 16, 16), _folderTexture);
+						//	render the folder texture
+						Rect folderRect = EditorGUI.IndentedRect(lastRect);
+						float folderOffset = (folderRect.x - lastRect.x) + _folderXOffset;
+						if(_folderTexture != null)	GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), _folderTexture);
 
-						if(_directories[i].selected)
+						//	if its selected also draw the selection texture 
+						if(_viewerDirectories[i].IsSelected && _selectionTexture != null)
 						{
-							DrawSelectedItem(_directories[i].controlRect);
+							GUI.DrawTexture(_viewerDirectories[i].SelectionRect, _selectionTexture);
 						}
-							
+
 						GUILayout.EndHorizontal();
 					}
 				}
@@ -237,117 +284,135 @@ public class AssetViewerWindow : EditorWindow
 		}
 
 		GUILayout.EndScrollView();
+	}
 
-		ResizeScrollView();
-
-		EditorGUI.indentLevel = 0;
+	/// <summary>
+	/// Renders the folder view, for the right side of the screen.
+	/// </summary>
+	private void RenderFolderView()
+	{
 		_rightScroll = GUILayout.BeginScrollView(_rightScroll, false, false);
 
-		for(int i = 0; i < _directories.Count; ++i)
-		{
-			if(_directories[i].selected == true)
-			{
-				EditorGUILayout.LabelField(_directories[i].displayName, EditorStyles.boldLabel);
-				Rect lastRect = GUILayoutUtility.GetLastRect();
-				if(_selectionTexture != null) GUI.DrawTexture(lastRect, _selectionTexture);
+		//	we dont' care about indent on the right side
+		EditorGUI.indentLevel = 0;
 
-				if(_directories[i].subDirectories.Length > 0 || _directories[i].files.Length > 0)
+		//	cycle through and show all files and subdirectories of the currently selected viewerDirectory
+		for(int i = 0; i < _viewerDirectories.Count; ++i)
+		{
+			if(_viewerDirectories[i].IsSelected == true)
+			{
+				//	render the label at the top, with a selection texture behind it
+				//	for examples Assets->AssetsToBundle->Globals
+				EditorGUILayout.LabelField(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
+				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
+
+				//	if there are either sub directories or files to show
+				if(_viewerDirectories[i].SubDirectories.Length > 0 || _viewerDirectories[i].Files.Length > 0)
 				{
-					for(int j = 0; j < _directories[i].subDirectories.Length; ++j)
+					//	TODO don't recreate this list every frame
+					_viewerDirectories[i].FileRects = new List<Rect>();
+
+					//	show all sub directories first
+					for(int j = 0; j < _viewerDirectories[i].SubDirectories.Length; ++j)
 					{
-						EditorGUILayout.LabelField(string.Format("     {0}", _directories[i].subDirectories[j].Name));
-						Rect r = GUILayoutUtility.GetLastRect();
-						if(_folderTexture != null) GUI.DrawTexture(new Rect(r.x, r.y, 16, 16), _folderTexture);
+						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].SubDirectories[j].Name));
+						Rect lastRect = GUILayoutUtility.GetLastRect();
+						if(_folderTexture != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), _folderTexture);
+
+						_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
 					}
 
-					for(int j = 0; j < _directories[i].files.Length; ++j)
-					{
-						EditorGUILayout.LabelField(string.Format("     {0}", _directories[i].files[j].Name));
-						Rect r = GUILayoutUtility.GetLastRect();
 
-						string fileLocation = _directories[i].files[j].FullName.Substring(LenghtOfProjectPath);
-						Texture tex = AssetDatabase.GetCachedIcon(fileLocation);
-						if(tex != null) GUI.DrawTexture(new Rect(r.x, r.y, 16, 16), tex);
+					//	show dem files!
+					for(int j = 0; j < _viewerDirectories[i].Files.Length; ++j)
+					{
+						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].Files[j].Name));
+						Rect lastRect = GUILayoutUtility.GetLastRect();
+						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
+						if(tex != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
+
+						_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
 					}
 				}
 				else
 				{
-					EditorGUILayout.LabelField("This folder is empty");
+					EditorGUILayout.LabelField(_noFilesOrSubDir);
 				}
 			}
 		}
+
 		GUILayout.EndScrollView();
+	}
 
-		GUILayout.EndHorizontal();
-
-		for(int i = 0; i < _directories.Count; ++i)
+	/// <summary>
+	/// Renders the divider, based on how the screen is positioned and updates the split view display.
+	/// </summary>
+	private void RenderDivider()
+	{
+		if(Event.current.type == EventType.mouseDown && _dividerRect.Contains(Event.current.mousePosition))
 		{
-			if(_mousePosition.HasValue && _directories[i].controlRect.Contains(_mousePosition.Value))
-			{
-				//	if we switch one to true lets reset all others to false
-				for(int j = 0; j < _directories.Count; ++j)
-				{
-					_directories[j].selected = false;
-				}
-
-				string fileLocation = _directories[i].dir.FullName.Substring(LenghtOfProjectPath);
-				//Debug.Log("selected " + fileLocation);
-				Object obj = AssetDatabase.LoadAssetAtPath(fileLocation, typeof(Object));
-				Selection.activeObject = obj;
-
-				_directories[i].selected = true;
-			}
+			_isResizing = true;
 		}
+
+		if(_isResizing)
+		{
+			_currentViewWidth = Event.current.mousePosition.x;
+			_dividerRect.Set(_currentViewWidth, _dividerRect.y, _dividerRect.width, _dividerRect.height);
+		}
+
+		if(Event.current.type == EventType.MouseUp)
+		{
+			_isResizing = false;        
+		}
+
+		if(_dividerTexture != null) { GUI.DrawTexture(_dividerRect, _dividerTexture); }
+		EditorGUIUtility.AddCursorRect(_dividerRect, MouseCursor.ResizeHorizontal);
 	}
 
-	public void OnInspectorUpdate() 
+	/// <summary>
+	/// Updates the viewer directories based on if they are expanded or not. 
+	/// </summary>
+	private void UpdateViewerDirectories()
 	{
-		Repaint();
-		AssetDatabase.Refresh();
-	}
-
-	private void UpdateExpandedDirectories()
-	{
+		//	we store out an updated variable to detect if we have to move folders / files
+		//	only update the ViewerDirectory list if we had to perform a move and only do it once!
 		bool updated = false;
 
-		for(int i = 0; i < _directories.Count; ++i)
+		//	cycle through and see if any viewer directories have had their expanded status changed
+		for(int i = 0; i < _viewerDirectories.Count; ++i)
 		{
-			if(_directories[i].expanded == true && !_expandedDirectories.Contains(_directories[i].expandedDirName))
+			//	we just opened something!
+			if(_viewerDirectories[i].IsExpanded == true && !_expandedDirectories.Contains(_viewerDirectories[i].ExpandedDirectoryName))
 			{
-				_expandedDirectories.Add(_directories[i].expandedDirName);
-				_openedDirectories.Add(_directories[i].expandedDirName);
-
-				for(int j = 0; j < _directories.Count; ++j)
-				{
-					_directories[j].setRect = true;
-				}
+				_expandedDirectories.Add(_viewerDirectories[i].ExpandedDirectoryName);
+				_openedDirectories.Add(_viewerDirectories[i].ExpandedDirectoryName);
 			}
-			else if(_directories[i].expanded == false && _expandedDirectories.Contains(_directories[i].expandedDirName))
+			//	we just closed something!
+			else if(_viewerDirectories[i].IsExpanded == false && _expandedDirectories.Contains(_viewerDirectories[i].ExpandedDirectoryName))
 			{
-				_removedDirectories.Add(_directories[i].expandedDirName);
-				_expandedDirectories.Remove(_directories[i].expandedDirName);
-
-				for(int j = 0; j < _directories.Count; ++j)
-				{
-					_directories[j].setRect = true;
-				}
+				_expandedDirectories.Remove(_viewerDirectories[i].ExpandedDirectoryName);
+				_removedDirectories.Add(_viewerDirectories[i].ExpandedDirectoryName);
 			}
 		}
 
+		//	cycle through all opened directories and set up the tilde!
 		for(int j = _openedDirectories.Count - 1; j >= 0; j--)
 		{
-			for(int i = 0; i < _directories.Count; ++i)
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				if(_openedDirectories[j] == _directories[i].expandedParentName)
+				if(_openedDirectories[j] == _viewerDirectories[i].ExpandedParentName)
 				{
-				//	Debug.Log("OPEN " + i + " " + _directories[i].dir.FullName);
-					if(_directories[i].dir.FullName.Contains("~"))
+					//	found one to open!
+					if(_viewerDirectories[i].Directory.FullName.Contains("~"))
 					{
-						string newPath = _directories[i].dir.FullName.Replace("~", string.Empty);
+						string newPath = _viewerDirectories[i].Directory.FullName.Replace("~", string.Empty);
+						bool exists = Directory.Exists(newPath);
 
-						_directories[i].dir.MoveTo(newPath);
-						//_directories[i].dir = new DirectoryInfo(newPath);
-						updated = true;
+						if(exists == false)
+						{
+							_viewerDirectories[i].Directory.MoveTo(newPath);
+							updated = true;
+						}
 					}
 				}
 			}
@@ -355,64 +420,34 @@ public class AssetViewerWindow : EditorWindow
 		_openedDirectories.Clear();
 
 		//	we store out all recently removed directories
-		//	if the directory was closed we then check to see if any diretories share a parent
+		//	if the directory was closed we then check to see if any directories share a parent
 		//	if they share a parent we force the directory closed
 		for(int j = _removedDirectories.Count - 1; j >= 0; j--)
 		{
-			for(int i = 0; i < _directories.Count; ++i)
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				if(_removedDirectories[j] == _directories[i].expandedParentName )
+				//	found one to close!
+				if(_removedDirectories[j] == _viewerDirectories[i].ExpandedParentName )
 				{
-					string newPath = _directories[i].dir.FullName + "~";
+					string newPath = _viewerDirectories[i].Directory.FullName + "~";
 					bool exists = Directory.Exists(newPath);
-				//	Debug.Log("CLOSED " + i + " " + _directories[i].expandedDirName + " " + exists);
 
 					if(exists == false)
 					{
-						_directories[i].dir.MoveTo(newPath);
-						//_directories[i].dir = new DirectoryInfo(newPath);
+						_viewerDirectories[i].Directory.MoveTo(newPath);
 						updated = true;
 					}
-					_directories[i].expanded = false;
+					_viewerDirectories[i].IsExpanded = false;
 				}
 			}
 		}
 		_removedDirectories.Clear();
 
+		//	update all the ViewerDirectories!
 		if(updated)
 		{
-			OnFocus();
+			InitViewerWindow();
 			updated = false;
-		}
-	}
-
-	private void DrawSelectedItem(Rect rect)
-	{
-		//rect.Set(0, rect.y, rect.width + rect.x, rect.height);
-
-		GUI.DrawTexture(rect, _selectionTexture);
-	//	EditorGUIUtility.AddCursorRect(rect, MouseCursor.RotateArrow);
-	}
-
-	private void ResizeScrollView()
-	{
-		GUI.DrawTexture(cursorChangeRect, _selectionTexture);
-		EditorGUIUtility.AddCursorRect(cursorChangeRect, MouseCursor.ResizeHorizontal);
-
-		if( Event.current.type == EventType.mouseDown && cursorChangeRect.Contains(Event.current.mousePosition))
-		{
-			resize = true;
-		}
-
-		if(resize)
-		{
-			currentScrollViewWidth = Event.current.mousePosition.x;
-			cursorChangeRect.Set(currentScrollViewWidth, cursorChangeRect.y, cursorChangeRect.width, cursorChangeRect.height);
-		}
-
-		if(Event.current.type == EventType.MouseUp)
-		{
-			resize = false;        
 		}
 	}
 }
