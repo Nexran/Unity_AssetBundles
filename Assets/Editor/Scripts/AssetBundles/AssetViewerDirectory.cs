@@ -7,6 +7,8 @@ using System.Collections.Generic;
 public class AssetViewerInfo
 {
 	public FileSystemInfo FileSystemInfo { get; set; }
+	public Rect SelectionRect { get; set; }
+	public bool IsSelected { get; set; }
 
 	public AssetViewerInfo(FileSystemInfo info)
 	{
@@ -102,9 +104,9 @@ public class AssetViewerDirectory
 	public string GetProjectPathFileLocation(int index)
 	{
 		string projectPathFile = string.Empty;
-		if(Files !=  null && Files.Length != 0)
+		if(AssetInfo != null && AssetInfo.Count != 0)
 		{
-			projectPathFile = Files[index].FullName.Substring(LenghtOfProjectPath);
+			projectPathFile = AssetInfo[index].FileSystemInfo.FullName.Substring(LenghtOfProjectPath);
 		}
 		return projectPathFile;
 	}

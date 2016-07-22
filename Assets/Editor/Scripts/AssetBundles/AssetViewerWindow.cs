@@ -116,24 +116,28 @@ public class AssetViewerWindow : EditorWindow
 
 		if(_mousePosition.HasValue)
 		{
-			_rightMousePosition = new Vector2?(new Vector2(_mousePosition.Value.x + _currentViewWidth, _mousePosition.Value.y));
+			_rightMousePosition = new Vector2?(new Vector2(_mousePosition.Value.x , _mousePosition.Value.y));
 		}
 
 		if(_rightMousePosition.HasValue)
 		{
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				if(_viewerDirectories[i].IsSelected == true && _viewerDirectories[i].FileRects != null)
+				if(_viewerDirectories[i].IsSelected == true && _viewerDirectories[i].AssetInfo != null)
 				{
-					Debug.Log(_viewerDirectories[i].FileRects.Count + " " + _mousePosition.Value);
-					for(int j = 0; j < _viewerDirectories[i].FileRects.Count; ++j)
+					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
 					{
-						Debug.Log(_viewerDirectories[i].FileRects[j]);
-
-						if(_viewerDirectories[i].FileRects[j].Contains(_mousePosition.Value))
+						if(_viewerDirectories[i].AssetInfo[j].SelectionRect.Contains(_rightMousePosition.Value))
 						{
+							//	if we switch one to true lets reset all others to false
+							for(int a = 0; a < _viewerDirectories[i].AssetInfo.Count; ++a)
+							{
+								_viewerDirectories[i].AssetInfo[a].IsSelected = false;
+							}
+
 							Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
 							if(obj != null) { Selection.activeObject = obj; }
+							_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 						}
 					}
 				}
@@ -307,8 +311,29 @@ public class AssetViewerWindow : EditorWindow
 				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
 
 				//	if there are either sub directories or files to show
-				if(_viewerDirectories[i].SubDirectories.Length > 0 || _viewerDirectories[i].Files.Length > 0)
+				if(_viewerDirectories[i].AssetInfo != null && _viewerDirectories[i].AssetInfo.Count > 0)
 				{
+					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+					{
+						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name));
+						Rect lastRect = GUILayoutUtility.GetLastRect();
+						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
+						if(tex != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
+
+						//	TODO look into a better way to set these rects
+					//	if(Event.current.type == EventType.MouseDown) 
+					//	{
+							_viewerDirectories[i].AssetInfo[j].SelectionRect = new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
+					//	}
+						//_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
+
+						//	if its selected also draw the selection texture 
+						if(_viewerDirectories[i].AssetInfo[j].IsSelected && _selectionTexture != null)
+						{
+							GUI.DrawTexture(lastRect, _selectionTexture);
+						}
+					}
+					/*
 					//	TODO don't recreate this list every frame
 					_viewerDirectories[i].FileRects = new List<Rect>();
 
@@ -333,6 +358,7 @@ public class AssetViewerWindow : EditorWindow
 
 						_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
 					}
+					*/
 				}
 				else
 				{
