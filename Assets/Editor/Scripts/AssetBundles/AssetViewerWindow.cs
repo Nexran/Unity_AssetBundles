@@ -10,21 +10,26 @@ using System.Linq;
 public class AssetViewerWindow : EditorWindow
 {
 	private static string _windowName = "Asset Viewer";
-	private static string _selectionTextureName = "opacity.png";
 	private static string _defaultFolderName = "Assets";
 	private static float _dividerWidth = 2f;
 	private static char _smallRightArrowUnicode = '\u25B8';
 	private static float _folderXOffset = 17f;
 	private static string _noFilesOrSubDir = "This folder is empty";
 
-	private static Texture _selectionTexture;
-	private static Texture _dividerTexture;
-	private static Texture2D _folderTexture;
+	private static string _tildeFolderTextureName = "TildeFolderIcon.png";
+	private static string _selectionTextureName = "Title.png";
+	private static string _selectedTextureName = "SelectedTexture.png";
 
-	private List<AssetViewerDirectory> _viewerDirectories;
-	private List<string> _expandedDirectories;
-	private List<string> _removedDirectories;
-	private List<string> _openedDirectories;
+	private static Texture _selectionTexture;
+	private static Texture _selectedTexture;
+	private static Texture _dividerTexture;
+	private static Texture _folderTexture;
+	private static Texture _tildeFolderTexture;
+
+	private List<AssetViewerDirectory> _viewerDirectories = new List<AssetViewerDirectory>();
+	private List<string> _expandedDirectories = new List<string>();
+	private List<string> _removedDirectories = new List<string>();
+	private List<string> _openedDirectories = new List<string>();
 
 	private Vector2 _leftScroll;
 	private Vector2 _rightScroll;
@@ -53,12 +58,9 @@ public class AssetViewerWindow : EditorWindow
 		//	this searches in the default folder Editor Default Resources for the texture
 		_selectionTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
 		_dividerTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
-		_folderTexture = AssetDatabase.GetCachedIcon(_defaultFolderName) as Texture2D;
-
-		_viewerDirectories = new List<AssetViewerDirectory>();
-		_expandedDirectories = new List<string>();
-		_removedDirectories= new List<string>();
-		_openedDirectories = new List<string>();
+		_selectedTexture = EditorGUIUtility.Load(_selectedTextureName) as Texture;
+		_tildeFolderTexture = EditorGUIUtility.Load(_tildeFolderTextureName) as Texture;
+		_folderTexture = AssetDatabase.GetCachedIcon(_defaultFolderName) as Texture;
 	}
 
 	/// <summary>
@@ -87,11 +89,13 @@ public class AssetViewerWindow : EditorWindow
 		//	calculate mouse position before any other part due to other logic potentially 
 		//	altering the mouse position and setting the Event.current.type to USED instead of Mouse Down
 		//	mouse position being null means the mouse wasn't pressed down
-		Vector2? _mousePosition = null;
+		Vector2? _leftMousePosition = null;
+		Vector2? _rightMousePosition = null;
 		if(Event.current.type == EventType.MouseDown)
 		{
 			//	adjust for if the user has scrolled the view down the page
-			_mousePosition = Event.current.mousePosition + _leftScroll;
+			_leftMousePosition = Event.current.mousePosition + _leftScroll;
+			_rightMousePosition = Event.current.mousePosition + _rightScroll;
 		}
 		//	only update directories when the Event is either Repaint or Layout so it doesn't change while calculating what to render
 		else if(Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout)
@@ -112,13 +116,27 @@ public class AssetViewerWindow : EditorWindow
 
 		GUILayout.EndHorizontal();
 
-		Vector2? _rightMousePosition = null;
-
-		if(_mousePosition.HasValue)
+		//	check to see if the left side of the screen has a mouse press 
+		//	and select / highlight the correct path
+		if(_leftMousePosition.HasValue)
 		{
-			_rightMousePosition = new Vector2?(new Vector2(_mousePosition.Value.x , _mousePosition.Value.y));
+			//	cycle through all directories and check to see if a directory has been clicked on
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
+			{
+				if(_viewerDirectories[i].SelectionRect.Contains(_leftMousePosition.Value))
+				{
+					//	if we switch one to true lets reset all others to false
+					for(int j = 0; j < _viewerDirectories.Count; ++j)
+					{
+						_viewerDirectories[j].IsSelected = false;
+					}
+					_viewerDirectories[i].IsSelected = true;
+				}
+			}
 		}
 
+		//	check to see if the right side of the screen has a mouse press 
+		//	and select / highlight the correct path
 		if(_rightMousePosition.HasValue)
 		{
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
@@ -130,37 +148,20 @@ public class AssetViewerWindow : EditorWindow
 						if(_viewerDirectories[i].AssetInfo[j].SelectionRect.Contains(_rightMousePosition.Value))
 						{
 							//	if we switch one to true lets reset all others to false
-							for(int a = 0; a < _viewerDirectories[i].AssetInfo.Count; ++a)
+							for(int a = 0; a < _viewerDirectories.Count; ++a)
 							{
-								_viewerDirectories[i].AssetInfo[a].IsSelected = false;
+								for(int b = 0; b < _viewerDirectories[a].AssetInfo.Count; ++b)
+								{
+									_viewerDirectories[a].AssetInfo[b].IsSelected = false;
+								}
 							}
 
+							//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
 							Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
 							if(obj != null) { Selection.activeObject = obj; }
 							_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 						}
 					}
-				}
-			}
-		}
-
-		//	cycle through all directories and check to see if a directory has been clicked on
-		for(int i = 0; i < _viewerDirectories.Count; ++i)
-		{
-			if(_mousePosition.HasValue)
-			{
-				if(_viewerDirectories[i].SelectionRect.Contains(_mousePosition.Value))
-				{
-					//	if we switch one to true lets reset all others to false
-					for(int j = 0; j < _viewerDirectories.Count; ++j)
-					{
-						_viewerDirectories[j].IsSelected = false;
-					}
-
-					//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
-					Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].ProjectPathFolderLocation, typeof(Object));
-					if(obj != null) { Selection.activeObject = obj; }
-					_viewerDirectories[i].IsSelected = true;
 				}
 			}
 		}
@@ -251,21 +252,29 @@ public class AssetViewerWindow : EditorWindow
 					{
 						GUILayout.BeginHorizontal();
 
+						//	if its selected also draw the selection texture
+						//	draw this first so the label/ foldout / image are rendered over
+						if(_viewerDirectories[i].IsSelected && _selectedTexture != null)
+						{
+							GUI.DrawTexture(_viewerDirectories[i].SelectionRect, _selectedTexture);
+						}
+
 						//	show a foldout if the directory has sub directories
 						//	we add in extra spaces for the folder to be placed inbetween
-						if(_viewerDirectories[i].SubDirectories.Length == 0)
-						{
-							EditorGUILayout.LabelField(string.Format("          {0}", _viewerDirectories[i].Directory.Name));
-						}
-						else
+						if(_viewerDirectories[i].ContainsSubDirectories)
 						{
 							_viewerDirectories[i].IsExpanded = EditorGUILayout.Foldout(_viewerDirectories[i].IsExpanded,
 								string.Format("      {0}", _viewerDirectories[i].Directory.Name));
 						}
+						else
+						{
+							EditorGUILayout.LabelField(string.Format("          {0}", _viewerDirectories[i].Directory.Name));
+						}
 
 						Rect lastRect = GUILayoutUtility.GetLastRect();
-						//	TODO look into a better way to set these rects
-						if(Event.current.type == EventType.MouseDown) 
+						//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
+						//	we check to make sure its a valid size, anything larger than default 
+						if(lastRect.width > 1f)
 						{
 							_viewerDirectories[i].SelectionRect = new Rect(0, lastRect.y, lastRect.width + lastRect.x, lastRect.height);
 						}
@@ -273,12 +282,14 @@ public class AssetViewerWindow : EditorWindow
 						//	render the folder texture
 						Rect folderRect = EditorGUI.IndentedRect(lastRect);
 						float folderOffset = (folderRect.x - lastRect.x) + _folderXOffset;
-						if(_folderTexture != null)	GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), _folderTexture);
-
-						//	if its selected also draw the selection texture 
-						if(_viewerDirectories[i].IsSelected && _selectionTexture != null)
+						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].ProjectPathFolderLocation);
+						if(tex != null) 
 						{
-							GUI.DrawTexture(_viewerDirectories[i].SelectionRect, _selectionTexture);
+							GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), tex);
+						}
+						else if(_folderTexture != null)
+						{
+							GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), _folderTexture);
 						}
 
 						GUILayout.EndHorizontal();
@@ -315,50 +326,32 @@ public class AssetViewerWindow : EditorWindow
 				{
 					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
 					{
+						//	if its selected also draw the selection texture 
+						if(_viewerDirectories[i].AssetInfo[j].IsSelected && _selectedTexture != null)
+						{
+							GUI.DrawTexture(_viewerDirectories[i].AssetInfo[j].DrawRect, _selectedTexture);
+						}
+
 						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name));
 						Rect lastRect = GUILayoutUtility.GetLastRect();
 						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
-						if(tex != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
-
-						//	TODO look into a better way to set these rects
-					//	if(Event.current.type == EventType.MouseDown) 
-					//	{
-							_viewerDirectories[i].AssetInfo[j].SelectionRect = new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
-					//	}
-						//_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
-
-						//	if its selected also draw the selection texture 
-						if(_viewerDirectories[i].AssetInfo[j].IsSelected && _selectionTexture != null)
+						if(tex != null) 
 						{
-							GUI.DrawTexture(lastRect, _selectionTexture);
+							GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
+						}
+						else if(_tildeFolderTexture != null)
+						{
+							GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), _tildeFolderTexture);
+						}
+
+						//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
+						//	we check to make sure its a valid size, anything larger than default 
+						if(lastRect.width > 1f)
+						{
+							_viewerDirectories[i].AssetInfo[j].SelectionRect = new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
+							_viewerDirectories[i].AssetInfo[j].DrawRect = lastRect;
 						}
 					}
-					/*
-					//	TODO don't recreate this list every frame
-					_viewerDirectories[i].FileRects = new List<Rect>();
-
-					//	show all sub directories first
-					for(int j = 0; j < _viewerDirectories[i].SubDirectories.Length; ++j)
-					{
-						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].SubDirectories[j].Name));
-						Rect lastRect = GUILayoutUtility.GetLastRect();
-						if(_folderTexture != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), _folderTexture);
-
-						_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
-					}
-
-
-					//	show dem files!
-					for(int j = 0; j < _viewerDirectories[i].Files.Length; ++j)
-					{
-						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].Files[j].Name));
-						Rect lastRect = GUILayoutUtility.GetLastRect();
-						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
-						if(tex != null) GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
-
-						_viewerDirectories[i].FileRects.Add(new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height));
-					}
-					*/
 				}
 				else
 				{
@@ -455,6 +448,16 @@ public class AssetViewerWindow : EditorWindow
 				//	found one to close!
 				if(_removedDirectories[j] == _viewerDirectories[i].ExpandedParentName )
 				{
+					//	try to destroy and meta files that exist
+					//	meta files are used to show folders in Unity the tilde property ensures meta files are NOT created
+					//	if we did not destroy all meta files here if you close a folder at the top of a directory all the meta files
+					//	will not get destroyed which will cause errors to pop up in the editor
+					FileInfo metaFile = new FileInfo(_viewerDirectories[i].Directory.FullName + ".meta");
+					if(metaFile != null && metaFile.Exists == true)
+					{
+						metaFile.Delete();
+					}
+
 					string newPath = _viewerDirectories[i].Directory.FullName + "~";
 					bool exists = Directory.Exists(newPath);
 
@@ -475,5 +478,9 @@ public class AssetViewerWindow : EditorWindow
 			InitViewerWindow();
 			updated = false;
 		}
+	}
+	private static int LenghtOfProjectPath
+	{
+		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
 	}
 }

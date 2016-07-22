@@ -4,18 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 
-public class AssetViewerInfo
-{
-	public FileSystemInfo FileSystemInfo { get; set; }
-	public Rect SelectionRect { get; set; }
-	public bool IsSelected { get; set; }
-
-	public AssetViewerInfo(FileSystemInfo info)
-	{
-		FileSystemInfo = info;
-	}
-}
-
 /// <summary>
 /// Asset viewer directory, stores a custom directory along with sub directories, files, and special logic to view in the Asset Viewer Window.
 /// </summary>
@@ -34,12 +22,11 @@ public class AssetViewerDirectory
 		
 	public DirectoryInfo Directory { get; private set; }
 	public DirectoryInfo ParentDirectory { get; private set; }
-	public DirectoryInfo [] SubDirectories { get; private set; }
-	public FileInfo [] Files { get; private set; }
 
-	public List<AssetViewerInfo> AssetInfo { get; set; }
+	public List<AssetViewerInfo> AssetInfo { get; private set; }
 	public List<Rect> FileRects { get; set; }
 
+	public bool ContainsSubDirectories { get; private set; }
 	public bool IsSelected { get; set; }
 	public bool IsExpanded { get; set; }
 	public Rect SelectionRect { get; set; }
@@ -60,25 +47,27 @@ public class AssetViewerDirectory
 	{
 		Directory = directory;
 		ParentDirectory = directory.Parent;
-		SubDirectories = directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
-
-		//	ignore all files with .meta or .DS_Store
-		Files = directory.GetFiles("*", SearchOption.TopDirectoryOnly).
-			Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
-
-		AssetInfo = new List<AssetViewerInfo>();
-		for(int i = 0; i < SubDirectories.Length; ++i)
-		{
-			AssetInfo.Add(new AssetViewerInfo(SubDirectories[i]));
-		}
-		for(int i = 0; i < Files.Length; ++i)
-		{
-			AssetInfo.Add(new AssetViewerInfo(Files[i]));
-		}
+		DirectoryInfo [] subDirectories = directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
 
 		IsSelected = false;
 		IsExpanded = false;
+		ContainsSubDirectories = false;
 
+		//	ignore all files with .meta or .DS_Store
+		FileInfo [] files = directory.GetFiles("*", SearchOption.TopDirectoryOnly).
+			Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
+
+		AssetInfo = new List<AssetViewerInfo>();
+		for(int i = 0; i < subDirectories.Length; ++i)
+		{
+			ContainsSubDirectories = true;
+			AssetInfo.Add(new AssetViewerInfo(subDirectories[i]));
+		}
+		for(int i = 0; i < files.Length; ++i)
+		{
+			AssetInfo.Add(new AssetViewerInfo(files[i]));
+		}
+			
 		//	set all path names, remove all ~ 
 		ExpandedDirectoryName = directory.FullName.Replace("~", string.Empty);
 		ExpandedParentName = directory.Parent.FullName.Replace("~", string.Empty);
@@ -90,7 +79,7 @@ public class AssetViewerDirectory
 		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
 
 		//	if they are no tilde subdirectories it means the directory should be expanded by default
-		if(SubDirectories != null && !SubDirectories.Any(o => o.FullName.Contains("~")))
+		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")))
 		{
 			IsExpanded = true;
 		}
