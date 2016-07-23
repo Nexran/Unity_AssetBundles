@@ -7,12 +7,15 @@ using System.IO;
 public class AssetViewerInfo
 {
 	public FileSystemInfo FileSystemInfo { get; private set; }
+	public string FileSystemName { get; private set; }
+
 	public Rect SelectionRect { get; set; }
 	public Rect DrawRect { get; set; }
 	public bool IsSelected { get; set; }
 
-	public AssetViewerInfo(FileSystemInfo info)
+	public AssetViewerInfo(FileSystemInfo info, string fileSystemName)
 	{
 		FileSystemInfo = info;
+		FileSystemName = fileSystemName;
 	}
 }

@@ -61,11 +61,11 @@ public class AssetViewerDirectory
 		for(int i = 0; i < subDirectories.Length; ++i)
 		{
 			ContainsSubDirectories = true;
-			AssetInfo.Add(new AssetViewerInfo(subDirectories[i]));
+			AssetInfo.Add(new AssetViewerInfo(subDirectories[i], subDirectories[i].FullName.Replace("~", string.Empty)));
 		}
 		for(int i = 0; i < files.Length; ++i)
 		{
-			AssetInfo.Add(new AssetViewerInfo(files[i]));
+			AssetInfo.Add(new AssetViewerInfo(files[i], files[i].FullName.Replace("~", string.Empty)));
 		}
 			
 		//	set all path names, remove all ~ 
@@ -98,5 +98,19 @@ public class AssetViewerDirectory
 			projectPathFile = AssetInfo[index].FileSystemInfo.FullName.Substring(LenghtOfProjectPath);
 		}
 		return projectPathFile;
+	}
+
+	public void Clone(AssetViewerDirectory directory)
+	{
+		this.IsSelected = directory.IsSelected;
+		this.IsExpanded = directory.IsExpanded;
+
+		if(this.AssetInfo.Count == directory.AssetInfo.Count)
+		{
+			for(int i = 0; i < this.AssetInfo.Count; ++i)
+			{
+				this.AssetInfo[i].IsSelected = directory.AssetInfo[i].IsSelected;
+			}
+		}
 	}
 }

@@ -30,6 +30,7 @@ public class AssetViewerWindow : EditorWindow
 	private List<string> _expandedDirectories = new List<string>();
 	private List<string> _removedDirectories = new List<string>();
 	private List<string> _openedDirectories = new List<string>();
+	private int _selectedIndex = -1;
 
 	private Vector2 _leftScroll;
 	private Vector2 _rightScroll;
@@ -130,6 +131,7 @@ public class AssetViewerWindow : EditorWindow
 					{
 						_viewerDirectories[j].IsSelected = false;
 					}
+					_selectedIndex = i;
 					_viewerDirectories[i].IsSelected = true;
 				}
 			}
@@ -137,29 +139,56 @@ public class AssetViewerWindow : EditorWindow
 
 		//	check to see if the right side of the screen has a mouse press 
 		//	and select / highlight the correct path
-		if(_rightMousePosition.HasValue)
+		if(_rightMousePosition.HasValue && _selectedIndex != -1)
 		{
-			for(int i = 0; i < _viewerDirectories.Count; ++i)
+			if(_viewerDirectories[_selectedIndex].IsSelected == true && _viewerDirectories[_selectedIndex].AssetInfo != null)
 			{
-				if(_viewerDirectories[i].IsSelected == true && _viewerDirectories[i].AssetInfo != null)
+				for(int j = 0; j < _viewerDirectories[_selectedIndex].AssetInfo.Count; ++j)
 				{
-					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+					if(_viewerDirectories[_selectedIndex].AssetInfo[j].SelectionRect.Contains(_rightMousePosition.Value))
 					{
-						if(_viewerDirectories[i].AssetInfo[j].SelectionRect.Contains(_rightMousePosition.Value))
+						//	if we switch one to true lets reset all others to false
+						for(int a = 0; a < _viewerDirectories.Count; ++a)
 						{
-							//	if we switch one to true lets reset all others to false
-							for(int a = 0; a < _viewerDirectories.Count; ++a)
+							for(int b = 0; b < _viewerDirectories[a].AssetInfo.Count; ++b)
 							{
-								for(int b = 0; b < _viewerDirectories[a].AssetInfo.Count; ++b)
+								_viewerDirectories[a].AssetInfo[b].IsSelected = false;
+							}
+						}
+
+						//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
+						Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[_selectedIndex].GetProjectPathFileLocation(j), typeof(Object));
+						if(obj != null) { Selection.activeObject = obj; }
+
+						//	 a user double clicks on the folder 
+						//	select the folder and expand the folder to mimic project folder hierarchy
+						if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
+						{
+							//	if there is no file extension which means its a folder expand it! 
+							if(string.IsNullOrEmpty(_viewerDirectories[_selectedIndex].AssetInfo[j].FileSystemInfo.Extension))
+							{
+								_viewerDirectories[_selectedIndex].IsSelected = false;
+								_viewerDirectories[_selectedIndex].IsExpanded = true;
+
+								for(int a = 0; a < _viewerDirectories.Count; ++a)
 								{
-									_viewerDirectories[a].AssetInfo[b].IsSelected = false;
+									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[_selectedIndex].AssetInfo[j].FileSystemName)
+									{
+										_viewerDirectories[a].IsSelected = true;
+										_selectedIndex = a;
+										break;
+									}
 								}
 							}
-
-							//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
-							Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
-							if(obj != null) { Selection.activeObject = obj; }
-							_viewerDirectories[i].AssetInfo[j].IsSelected = true;
+							else
+							{
+								_viewerDirectories[_selectedIndex].AssetInfo[j].IsSelected = true;
+								if(obj != null) { AssetDatabase.OpenAsset(obj); }
+							}
+						}
+						else
+						{
+							_viewerDirectories[_selectedIndex].AssetInfo[j].IsSelected = true;
 						}
 					}
 				}
@@ -213,6 +242,7 @@ public class AssetViewerWindow : EditorWindow
 			}
 			else
 			{
+				viewerDirectory.Clone(_viewerDirectories[index]);
 				_viewerDirectories.RemoveAt(index);
 				_viewerDirectories.Insert(index, viewerDirectory);
 			}
@@ -478,9 +508,5 @@ public class AssetViewerWindow : EditorWindow
 			InitViewerWindow();
 			updated = false;
 		}
-	}
-	private static int LenghtOfProjectPath
-	{
-		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
 	}
 }
