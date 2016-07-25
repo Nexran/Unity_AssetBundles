@@ -12,6 +12,7 @@ public class AssetViewerInfo
 	public Rect SelectionRect { get; set; }
 	public Rect DrawRect { get; set; }
 	public bool IsSelected { get; set; }
+	public bool IsSearched { get; set; }
 
 	public AssetViewerInfo(FileSystemInfo info, string fileSystemName)
 	{

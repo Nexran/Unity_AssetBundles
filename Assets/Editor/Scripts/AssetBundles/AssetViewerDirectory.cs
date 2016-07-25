@@ -30,6 +30,7 @@ public class AssetViewerDirectory
 	public bool IsSelected { get; set; }
 	public bool IsExpanded { get; set; }
 	public Rect SelectionRect { get; set; }
+	public bool IsSearched { get; set; }
 
 	public string ExpandedDirectoryName { get; private set; } 
 	public string ExpandedParentName { get; private set; }
@@ -104,12 +105,14 @@ public class AssetViewerDirectory
 	{
 		this.IsSelected = directory.IsSelected;
 		this.IsExpanded = directory.IsExpanded;
+		this.IsSearched = directory.IsSearched;
 
 		if(this.AssetInfo.Count == directory.AssetInfo.Count)
 		{
 			for(int i = 0; i < this.AssetInfo.Count; ++i)
 			{
 				this.AssetInfo[i].IsSelected = directory.AssetInfo[i].IsSelected;
+				this.AssetInfo[i].IsSearched = directory.AssetInfo[i].IsSearched;
 			}
 		}
 	}

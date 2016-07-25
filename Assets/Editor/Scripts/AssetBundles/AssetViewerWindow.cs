@@ -30,7 +30,6 @@ public class AssetViewerWindow : EditorWindow
 	private List<string> _expandedDirectories = new List<string>();
 	private List<string> _removedDirectories = new List<string>();
 	private List<string> _openedDirectories = new List<string>();
-	private int _selectedIndex = -1;
 
 	private Vector2 _leftScroll;
 	private Vector2 _rightScroll;
@@ -41,6 +40,11 @@ public class AssetViewerWindow : EditorWindow
 
 	private Rect _selectionRect;
 	private string _directoryDisplayName;
+
+	private string _searchText;
+	private string _currentSearchText;
+	private bool _searchTextChanged;
+	private bool _clearSearchText;
 
 	/// <summary>
 	/// Shows the window.
@@ -90,13 +94,13 @@ public class AssetViewerWindow : EditorWindow
 		//	calculate mouse position before any other part due to other logic potentially 
 		//	altering the mouse position and setting the Event.current.type to USED instead of Mouse Down
 		//	mouse position being null means the mouse wasn't pressed down
-		Vector2? _leftMousePosition = null;
-		Vector2? _rightMousePosition = null;
+		Vector2? leftMousePosition = null;
+		Vector2? rightMousePosition = null;
 		if(Event.current.type == EventType.MouseDown)
 		{
 			//	adjust for if the user has scrolled the view down the page
-			_leftMousePosition = Event.current.mousePosition + _leftScroll;
-			_rightMousePosition = Event.current.mousePosition + _rightScroll;
+			leftMousePosition = Event.current.mousePosition + _leftScroll;
+			rightMousePosition = Event.current.mousePosition + _rightScroll;
 		}
 		//	only update directories when the Event is either Repaint or Layout so it doesn't change while calculating what to render
 		else if(Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout)
@@ -117,21 +121,22 @@ public class AssetViewerWindow : EditorWindow
 
 		GUILayout.EndHorizontal();
 
+		RenderSearchArea();
+
 		//	check to see if the left side of the screen has a mouse press 
 		//	and select / highlight the correct path
-		if(_leftMousePosition.HasValue)
+		if(leftMousePosition.HasValue)
 		{
 			//	cycle through all directories and check to see if a directory has been clicked on
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				if(_viewerDirectories[i].SelectionRect.Contains(_leftMousePosition.Value))
+				if(_viewerDirectories[i].SelectionRect.Contains(leftMousePosition.Value))
 				{
 					//	if we switch one to true lets reset all others to false
-					for(int j = 0; j < _viewerDirectories.Count; ++j)
-					{
-						_viewerDirectories[j].IsSelected = false;
-					}
-					_selectedIndex = i;
+					ResetViewDirectories();
+
+					_clearSearchText = true;
+					_currentSearchText = string.Empty;
 					_viewerDirectories[i].IsSelected = true;
 				}
 			}
@@ -139,15 +144,26 @@ public class AssetViewerWindow : EditorWindow
 
 		//	check to see if the right side of the screen has a mouse press 
 		//	and select / highlight the correct path
-		if(_rightMousePosition.HasValue && _selectedIndex != -1)
+		if(rightMousePosition.HasValue)
 		{
-			if(_viewerDirectories[_selectedIndex].IsSelected == true && _viewerDirectories[_selectedIndex].AssetInfo != null)
+			bool switchDirectory = false;
+
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				for(int j = 0; j < _viewerDirectories[_selectedIndex].AssetInfo.Count; ++j)
-				{
-					if(_viewerDirectories[_selectedIndex].AssetInfo[j].SelectionRect.Contains(_rightMousePosition.Value))
+				if(_viewerDirectories[i].IsSelected == false && _viewerDirectories[i].IsSearched == false)
+					continue;
+
+				for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+				{				
+					//	if this is toggled we have just switche directories
+					//	we do not care about displaying anymore directories
+					//	just exit out
+					if(switchDirectory == true)
+						return;	
+					
+					if(_viewerDirectories[i].AssetInfo[j].SelectionRect.Contains(rightMousePosition.Value))
 					{
-						//	if we switch one to true lets reset all others to false
+						//	if we switch one to true lets reset all others sub assets to false
 						for(int a = 0; a < _viewerDirectories.Count; ++a)
 						{
 							for(int b = 0; b < _viewerDirectories[a].AssetInfo.Count; ++b)
@@ -157,38 +173,46 @@ public class AssetViewerWindow : EditorWindow
 						}
 
 						//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
-						Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[_selectedIndex].GetProjectPathFileLocation(j), typeof(Object));
+						Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
 						if(obj != null) { Selection.activeObject = obj; }
 
 						//	 a user double clicks on the folder 
 						//	select the folder and expand the folder to mimic project folder hierarchy
 						if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
 						{
-							//	if there is no file extension which means its a folder expand it! 
-							if(string.IsNullOrEmpty(_viewerDirectories[_selectedIndex].AssetInfo[j].FileSystemInfo.Extension))
-							{
-								_viewerDirectories[_selectedIndex].IsSelected = false;
-								_viewerDirectories[_selectedIndex].IsExpanded = true;
+							//	reset all serach / selected non-sense
+							ResetViewDirectories();
 
+							//	if there is no file extension which means its a folder expand it! 
+							if(string.IsNullOrEmpty(_viewerDirectories[i].AssetInfo[j].FileSystemInfo.Extension))
+							{
+								//	clear out the search field
+								_clearSearchText = true;
+								_currentSearchText = string.Empty;
+								switchDirectory = true;
+
+								_viewerDirectories[i].IsSelected = false;
+								_viewerDirectories[i].IsExpanded = true;
+
+								//	go through and select the correct directory
 								for(int a = 0; a < _viewerDirectories.Count; ++a)
 								{
-									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[_selectedIndex].AssetInfo[j].FileSystemName)
+									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[i].AssetInfo[j].FileSystemName)
 									{
 										_viewerDirectories[a].IsSelected = true;
-										_selectedIndex = a;
 										break;
 									}
 								}
 							}
 							else
 							{
-								_viewerDirectories[_selectedIndex].AssetInfo[j].IsSelected = true;
+								_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 								if(obj != null) { AssetDatabase.OpenAsset(obj); }
 							}
 						}
 						else
 						{
-							_viewerDirectories[_selectedIndex].AssetInfo[j].IsSelected = true;
+							_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 						}
 					}
 				}
@@ -329,6 +353,9 @@ public class AssetViewerWindow : EditorWindow
 		}
 
 		GUILayout.EndScrollView();
+
+		//	reset the indent level
+		EditorGUI.indentLevel = 0;
 	}
 
 	/// <summary>
@@ -338,17 +365,14 @@ public class AssetViewerWindow : EditorWindow
 	{
 		_rightScroll = GUILayout.BeginScrollView(_rightScroll, false, false);
 
-		//	we dont' care about indent on the right side
-		EditorGUI.indentLevel = 0;
-
 		//	cycle through and show all files and subdirectories of the currently selected viewerDirectory
 		for(int i = 0; i < _viewerDirectories.Count; ++i)
 		{
-			if(_viewerDirectories[i].IsSelected == true)
+			if(_viewerDirectories[i].IsSelected == true || _viewerDirectories[i].IsSearched)
 			{
 				//	render the label at the top, with a selection texture behind it
 				//	for examples Assets->AssetsToBundle->Globals
-				EditorGUILayout.LabelField(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
+				GUILayout.Label(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
 				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
 
 				//	if there are either sub directories or files to show
@@ -356,13 +380,18 @@ public class AssetViewerWindow : EditorWindow
 				{
 					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
 					{
+						//	if we are displaying search results check to see if this current asset is being searched
+						//	if not continue looking;
+						if(_viewerDirectories[i].IsSearched == true && _viewerDirectories[i].AssetInfo[j].IsSearched == false)
+							continue;
+						
 						//	if its selected also draw the selection texture 
 						if(_viewerDirectories[i].AssetInfo[j].IsSelected && _selectedTexture != null)
 						{
 							GUI.DrawTexture(_viewerDirectories[i].AssetInfo[j].DrawRect, _selectedTexture);
 						}
 
-						EditorGUILayout.LabelField(string.Format("     {0}", _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name));
+						GUILayout.Label(string.Format("     {0}", _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name));
 						Rect lastRect = GUILayoutUtility.GetLastRect();
 						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
 						if(tex != null) 
@@ -385,12 +414,63 @@ public class AssetViewerWindow : EditorWindow
 				}
 				else
 				{
-					EditorGUILayout.LabelField(_noFilesOrSubDir);
+					GUILayout.Label(_noFilesOrSubDir);
 				}
 			}
 		}
 
 		GUILayout.EndScrollView();
+	}
+
+	/// <summary>
+	/// Renders the search area, and handles initial logic to switch directories to searched.
+	/// </summary>
+	private void RenderSearchArea()
+	{
+		_searchTextChanged = false;
+
+		//	mimic Unitys search bar as close as possible
+		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
+		GUI.SetNextControlName("SearchToolBarField");
+		_currentSearchText = GUILayout.TextField(_currentSearchText, GUI.skin.FindStyle("ToolbarSeachTextField"));
+		if(GUILayout.Button("", GUI.skin.FindStyle("ToolbarSeachCancelButton")))
+		{
+			_currentSearchText = string.Empty;
+			GUI.FocusControl(null);
+		}
+		GUILayout.EndHorizontal();
+
+		//	check to see if the search text has changed
+		//	if it has reset all search results
+		if(_currentSearchText != _searchText && _clearSearchText == false)
+		{
+			_searchTextChanged = true;
+			ResetViewDirectories();
+		}
+
+		_searchText = _currentSearchText;
+		_clearSearchText = false;
+
+		//	check to see if we found any search results
+		if(string.IsNullOrEmpty(_currentSearchText) == false && _searchTextChanged == true)
+		{
+			//	we make sure every thing is lower case to ignore any case sensitivity issues
+			string toLowerSearch = _currentSearchText.ToLower();
+
+			for(int i = 0; i < _viewerDirectories.Count; ++i)
+			{
+				for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+				{
+					string directoryName = _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name.ToLower();
+
+					if(directoryName.Contains(toLowerSearch))
+					{
+						_viewerDirectories[i].IsSearched = true;
+						_viewerDirectories[i].AssetInfo[j].IsSearched = true;
+					}
+				}
+			}
+		}
 	}
 
 	/// <summary>
@@ -416,6 +496,23 @@ public class AssetViewerWindow : EditorWindow
 
 		if(_dividerTexture != null) { GUI.DrawTexture(_dividerRect, _dividerTexture); }
 		EditorGUIUtility.AddCursorRect(_dividerRect, MouseCursor.ResizeHorizontal);
+	}
+
+	/// <summary>
+	/// Resets the view directories, search and selected status to false.
+	/// </summary>
+	private void ResetViewDirectories()
+	{
+		for(int i = 0; i < _viewerDirectories.Count; ++i)
+		{
+			_viewerDirectories[i].IsSearched = false;
+			_viewerDirectories[i].IsSelected = false;
+			for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+			{
+				_viewerDirectories[i].AssetInfo[j].IsSearched = false;
+				_viewerDirectories[i].AssetInfo[j].IsSelected = false;
+			}
+		}
 	}
 
 	/// <summary>
