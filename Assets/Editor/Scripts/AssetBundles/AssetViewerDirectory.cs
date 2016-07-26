@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using UnityEditor;
 
 /// <summary>
 /// Asset viewer directory, stores a custom directory along with sub directories, files, and special logic to view in the Asset Viewer Window.
@@ -91,6 +92,42 @@ public class AssetViewerDirectory
 			if(j >= countToAdd)
 			{
 				DependencyDirectories.Add(toAdd);
+			}
+		}
+
+		for(int i = 0; i < AssetInfo.Count; ++i)
+		{			
+			AssetInfo[i].MissingComponents = new List<string>();
+
+			Object obj = AssetDatabase.LoadAssetAtPath(GetProjectPathFileLocation(i), typeof(Object));
+			GameObject gObj = obj as GameObject;
+
+			if(gObj != null)
+			{
+				Component [] components = gObj.GetComponents(typeof(Component));
+				for(int a = 0; a < components.Length; ++a)
+				{
+					SerializedObject s = new SerializedObject(components[a]);
+					SerializedProperty o = s.GetIterator();
+					while(o.NextVisible(true))
+					{
+						if(o.propertyType == SerializedPropertyType.ObjectReference)
+						{
+							if(o.objectReferenceValue == null && o.objectReferenceInstanceIDValue != 0)
+							{
+								AssetInfo[i].MissingComponents.Add("MISSING " + o.displayName);
+							}
+						}
+					}
+				}
+			}
+
+			string [] dependencies = AssetDatabase.GetDependencies(GetProjectPathFileLocation(i), false);
+
+			for(int j = 0; j < dependencies.Length; ++j)
+			{
+				FileInfo file = new FileInfo(dependencies[j]);
+				AssetInfo[i].Dependencies.Add(new AssetViewerInfo(file, file.FullName.Replace("~", string.Empty)));
 			}
 		}
 

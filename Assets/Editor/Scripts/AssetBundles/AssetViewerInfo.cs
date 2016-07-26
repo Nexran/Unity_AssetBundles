@@ -1,23 +1,40 @@
 ﻿using UnityEngine;
 using System.IO;
+using System.Collections.Generic;
+using UnityEditor;
 
 /// <summary>
 /// Asset viewer info, is used to show either a sub directory or a file with additional data.
 /// </summary>
 public class AssetViewerInfo
 {
+	/// <summary>
+	///	calculate the start index to get the length of the project path
+	///	this is used to get where in the local project Asset folder the path is
+	/// </summary>
+	/// <value>The lenght of project path.</value>
+	private static int LenghtOfProjectPath
+	{
+		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
+	}
+
 	public FileSystemInfo FileSystemInfo { get; private set; }
 	public string FileSystemName { get; private set; }
 	public string FolderName { get; private set; }
 	public bool CanExplore { get; private set; }
 
+	public List<AssetViewerInfo> Dependencies { get; set; }
+	public List<string> MissingComponents { get; set; }
+
 	public Rect SelectionRect { get; set; }
 	public Rect DrawRect { get; set; }
 	public bool IsSelected { get; set; }
 	public bool IsSearched { get; set; }
+	public bool ShowDependencies { get; private set; }
 
 	public AssetViewerInfo(FileSystemInfo info, string fileSystemName)
 	{
+		Dependencies = new List<AssetViewerInfo>();
 		FileSystemInfo = info;
 		FileSystemName = fileSystemName;
 		CanExplore = false;
@@ -40,6 +57,66 @@ public class AssetViewerInfo
 				if(j != 0) FolderName += Path.DirectorySeparatorChar;
 
 				FolderName += splitPath[j];
+			}
+		}
+	}
+
+	public void Render(Texture selectedTexture, Texture tildeFolderTexture, float currentViewWidth, bool fullName, GUIStyle guiStyle)
+	{
+		//	if its selected also draw the selection texture 
+		if(IsSelected && selectedTexture != null)
+		{
+			GUI.DrawTexture(DrawRect, selectedTexture);
+		}
+
+		EditorGUILayout.BeginHorizontal();
+
+		if((Dependencies != null && Dependencies.Count > 0) || (MissingComponents != null && MissingComponents.Count > 0))
+		{
+			ShowDependencies = GUILayout.Toggle(ShowDependencies, string.Empty, EditorStyles.foldout, GUILayout.Width(10));
+		}
+
+		string toShow = string.Empty;
+		if(fullName)
+		{
+			toShow = string.Format("     {0}", FileSystemInfo.FullName.Substring(LenghtOfProjectPath));
+		}
+		else
+		{
+			toShow = string.Format("     {0}", FileSystemInfo.Name);
+		}
+		GUILayout.Label(toShow, guiStyle);
+		Rect lastRect = GUILayoutUtility.GetLastRect();
+		Texture tex = AssetDatabase.GetCachedIcon(FileSystemInfo.FullName.Substring(LenghtOfProjectPath));
+		if(tex != null) 
+		{
+			GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
+		}
+		else if(tildeFolderTexture != null)
+		{
+			GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tildeFolderTexture);
+		}
+			
+		//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
+		//	we check to make sure its a valid size, anything larger than default 
+		if(lastRect.width > 1f)
+		{
+			SelectionRect = new Rect(lastRect.x + currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
+			DrawRect = lastRect;
+		}
+
+		EditorGUILayout.EndHorizontal();
+
+		if(ShowDependencies)
+		{
+			for(int a = 0; a < Dependencies.Count; ++a)
+			{
+				Dependencies[a].Render(selectedTexture, tildeFolderTexture, currentViewWidth, true, EditorStyles.miniLabel);
+			}
+
+			for(int a = 0; a < MissingComponents.Count; ++a)
+			{
+				GUILayout.Label(MissingComponents[a], EditorStyles.miniBoldLabel);
 			}
 		}
 	}

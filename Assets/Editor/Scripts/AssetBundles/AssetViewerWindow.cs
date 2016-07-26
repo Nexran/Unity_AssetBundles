@@ -391,31 +391,7 @@ public class AssetViewerWindow : EditorWindow
 						if(_viewerDirectories[i].IsSearched == true && _viewerDirectories[i].AssetInfo[j].IsSearched == false)
 							continue;
 						
-						//	if its selected also draw the selection texture 
-						if(_viewerDirectories[i].AssetInfo[j].IsSelected && _selectedTexture != null)
-						{
-							GUI.DrawTexture(_viewerDirectories[i].AssetInfo[j].DrawRect, _selectedTexture);
-						}
-
-						GUILayout.Label(string.Format("     {0}", _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name));
-						Rect lastRect = GUILayoutUtility.GetLastRect();
-						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].GetProjectPathFileLocation(j));
-						if(tex != null) 
-						{
-							GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);
-						}
-						else if(_tildeFolderTexture != null)
-						{
-							GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), _tildeFolderTexture);
-						}
-
-						//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
-						//	we check to make sure its a valid size, anything larger than default 
-						if(lastRect.width > 1f)
-						{
-							_viewerDirectories[i].AssetInfo[j].SelectionRect = new Rect(lastRect.x + _currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
-							_viewerDirectories[i].AssetInfo[j].DrawRect = lastRect;
-						}
+						_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _currentViewWidth, false, EditorStyles.label);
 					}
 				}
 				else
