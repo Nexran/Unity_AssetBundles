@@ -26,6 +26,8 @@ public class AssetViewerDirectory
 	public List<AssetViewerInfo> AssetInfo { get; private set; }
 	public List<Rect> FileRects { get; set; }
 
+	public List<string> DependencyDirectories { get; private set; }
+
 	public bool ContainsSubDirectories { get; private set; }
 	public bool IsSelected { get; set; }
 	public bool IsExpanded { get; set; }
@@ -73,6 +75,25 @@ public class AssetViewerDirectory
 		ExpandedDirectoryName = directory.FullName.Replace("~", string.Empty);
 		ExpandedParentName = directory.Parent.FullName.Replace("~", string.Empty);
 
+		//	set up all dependency directories
+		DependencyDirectories = new List<string>();
+		int countToAdd = baseIndentCount - 1;
+		string toAdd = string.Empty;
+		string [] splitPath = ExpandedDirectoryName.Split(Path.DirectorySeparatorChar);
+		//	we make sure the for loop will never add in the last part of the array the object this.jpg
+		for(int j = 0; j < splitPath.Length - 1; ++j)
+		{
+			//	add back the slashes, we skip adding the slash on the first pass
+			if(j != 0) toAdd += Path.DirectorySeparatorChar;
+
+			toAdd += splitPath[j];
+
+			if(j >= countToAdd)
+			{
+				DependencyDirectories.Add(toAdd);
+			}
+		}
+
 		//	for project path turn all / to -> 
 		ProjectPathDisplayName = ExpandedDirectoryName.Substring(LenghtOfProjectPath).
 			Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
@@ -80,7 +101,7 @@ public class AssetViewerDirectory
 		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
 
 		//	if they are no tilde subdirectories it means the directory should be expanded by default
-		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")))
+		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")) && !directory.Parent.FullName.Contains("~"))
 		{
 			IsExpanded = true;
 		}

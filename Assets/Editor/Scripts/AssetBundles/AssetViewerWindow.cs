@@ -42,7 +42,7 @@ public class AssetViewerWindow : EditorWindow
 	private string _directoryDisplayName;
 
 	private string _searchText;
-	private string _currentSearchText;
+	private string _currentSearchText = string.Empty;
 	private bool _searchTextChanged;
 	private bool _clearSearchText;
 
@@ -180,12 +180,12 @@ public class AssetViewerWindow : EditorWindow
 						//	select the folder and expand the folder to mimic project folder hierarchy
 						if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
 						{
-							//	reset all serach / selected non-sense
-							ResetViewDirectories();
-
 							//	if there is no file extension which means its a folder expand it! 
-							if(string.IsNullOrEmpty(_viewerDirectories[i].AssetInfo[j].FileSystemInfo.Extension))
+							if(_viewerDirectories[i].AssetInfo[j].CanExplore)
 							{
+								//	reset all serach / selected non-sense
+								ResetViewDirectories();
+
 								//	clear out the search field
 								_clearSearchText = true;
 								_currentSearchText = string.Empty;
@@ -197,7 +197,12 @@ public class AssetViewerWindow : EditorWindow
 								//	go through and select the correct directory
 								for(int a = 0; a < _viewerDirectories.Count; ++a)
 								{
-									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[i].AssetInfo[j].FileSystemName)
+									if(_viewerDirectories[i].DependencyDirectories.Contains(_viewerDirectories[a].ExpandedDirectoryName))
+									{
+										_viewerDirectories[a].IsExpanded = true;
+									}
+
+									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[i].AssetInfo[j].FolderName)
 									{
 										_viewerDirectories[a].IsSelected = true;
 										break;
@@ -206,6 +211,7 @@ public class AssetViewerWindow : EditorWindow
 							}
 							else
 							{
+								
 								_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 								if(obj != null) { AssetDatabase.OpenAsset(obj); }
 							}
@@ -542,7 +548,7 @@ public class AssetViewerWindow : EditorWindow
 		}
 
 		//	cycle through all opened directories and set up the tilde!
-		for(int j = _openedDirectories.Count - 1; j >= 0; j--)
+		for(int j = 0; j < _openedDirectories.Count; ++j)				
 		{
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
@@ -552,16 +558,18 @@ public class AssetViewerWindow : EditorWindow
 					if(_viewerDirectories[i].Directory.FullName.Contains("~"))
 					{
 						string newPath = _viewerDirectories[i].Directory.FullName.Replace("~", string.Empty);
+
 						bool exists = Directory.Exists(newPath);
 
-						if(exists == false)
+						if(exists == false && _viewerDirectories[i].Directory.Exists)
 						{
 							_viewerDirectories[i].Directory.MoveTo(newPath);
-							updated = true;
 						}
 					}
 				}
 			}
+			//	re-init every directory if multiple directories just opened
+			InitViewerWindow();
 		}
 		_openedDirectories.Clear();
 
@@ -585,13 +593,17 @@ public class AssetViewerWindow : EditorWindow
 						metaFile.Delete();
 					}
 
-					string newPath = _viewerDirectories[i].Directory.FullName + "~";
-					bool exists = Directory.Exists(newPath);
-
-					if(exists == false)
+					//	if it already ends with a tilde don't add another!
+					if(_viewerDirectories[i].Directory.FullName.EndsWith("~") == false)
 					{
-						_viewerDirectories[i].Directory.MoveTo(newPath);
-						updated = true;
+						string newPath = _viewerDirectories[i].Directory.FullName + "~";
+						bool exists = Directory.Exists(newPath);
+
+						if(exists == false)
+						{
+							_viewerDirectories[i].Directory.MoveTo(newPath);
+							updated = true;
+						}
 					}
 					_viewerDirectories[i].IsExpanded = false;
 				}
