@@ -381,6 +381,15 @@ public class AssetViewerWindow : EditorWindow
 				GUILayout.Label(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
 				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
 
+				/*
+				if(_viewerDirectories[i].AssetViewerManifest != null)
+				{
+					for(int j = 0; j < _viewerDirectories[i].AssetViewerManifest.Dependencies.Count; ++j)
+					{
+						_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _currentViewWidth, false, EditorStyles.label);
+					}
+				}*/
+
 				//	if there are either sub directories or files to show
 				if(_viewerDirectories[i].AssetInfo != null && _viewerDirectories[i].AssetInfo.Count > 0)
 				{

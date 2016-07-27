@@ -75,7 +75,7 @@ public class AssetViewerInfo
 		{
 			ShowDependencies = GUILayout.Toggle(ShowDependencies, string.Empty, EditorStyles.foldout, GUILayout.Width(10));
 		}
-
+						
 		string toShow = string.Empty;
 		if(fullName)
 		{
@@ -85,6 +85,7 @@ public class AssetViewerInfo
 		{
 			toShow = string.Format("     {0}", FileSystemInfo.Name);
 		}
+
 		GUILayout.Label(toShow, guiStyle);
 		Rect lastRect = GUILayoutUtility.GetLastRect();
 		Texture tex = AssetDatabase.GetCachedIcon(FileSystemInfo.FullName.Substring(LenghtOfProjectPath));
@@ -102,7 +103,7 @@ public class AssetViewerInfo
 		if(lastRect.width > 1f)
 		{
 			SelectionRect = new Rect(lastRect.x + currentViewWidth, lastRect.y, lastRect.width, lastRect.height);
-			DrawRect = lastRect;
+			DrawRect = new Rect(5, lastRect.y, lastRect.width, lastRect.height);
 		}
 
 		EditorGUILayout.EndHorizontal();

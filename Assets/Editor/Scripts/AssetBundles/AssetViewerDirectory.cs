@@ -28,6 +28,7 @@ public class AssetViewerDirectory
 	public List<Rect> FileRects { get; set; }
 
 	public List<string> DependencyDirectories { get; private set; }
+	public AssetViewerManifest AssetViewerManifest { get; private set; }
 
 	public bool ContainsSubDirectories { get; private set; }
 	public bool IsSelected { get; set; }
@@ -95,6 +96,7 @@ public class AssetViewerDirectory
 			}
 		}
 
+		//	set up all the asset info to detect missing components
 		for(int i = 0; i < AssetInfo.Count; ++i)
 		{			
 			AssetInfo[i].MissingComponents = new List<string>();
@@ -136,6 +138,22 @@ public class AssetViewerDirectory
 			Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
 
 		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
+
+		//	set up some offsets to find manifest
+		int assetToBundleOffset = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + LenghtOfProjectPath +  1;
+		int assetBundleOffset = AssetBundleSettings.Instance.AssetBundleDirectory.Length + 1;
+		string manifestDir = AssetBundleSettings.Instance.AssetBundleDirectory + "/" + 
+			ExpandedDirectoryName.Substring(assetToBundleOffset).ToLower() + 
+			".manifest";
+
+		//	if the manifest exists parse it!
+		if(System.IO.File.Exists(manifestDir))
+		{
+			AssetViewerManifest = new AssetViewerManifest(manifestDir, 
+				AssetBundleSettings.Instance.AssetsToBundleDirectory, 
+				LenghtOfProjectPath, 
+				assetBundleOffset);
+		}
 
 		//	if they are no tilde subdirectories it means the directory should be expanded by default
 		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")) && !directory.Parent.FullName.Contains("~"))
