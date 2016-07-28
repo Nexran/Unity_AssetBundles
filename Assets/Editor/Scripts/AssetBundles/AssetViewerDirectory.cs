@@ -35,6 +35,7 @@ public class AssetViewerDirectory
 	public bool IsExpanded { get; set; }
 	public Rect SelectionRect { get; set; }
 	public bool IsSearched { get; set; }
+	public bool ShowAssetBundleDependencies { get; set; }
 
 	public string ExpandedDirectoryName { get; private set; } 
 	public string ExpandedParentName { get; private set; }
@@ -57,6 +58,7 @@ public class AssetViewerDirectory
 		IsSelected = false;
 		IsExpanded = false;
 		ContainsSubDirectories = false;
+		ShowAssetBundleDependencies = false;
 
 		//	ignore all files with .meta or .DS_Store
 		FileInfo [] files = directory.GetFiles("*", SearchOption.TopDirectoryOnly).
@@ -182,6 +184,7 @@ public class AssetViewerDirectory
 		this.IsSelected = directory.IsSelected;
 		this.IsExpanded = directory.IsExpanded;
 		this.IsSearched = directory.IsSearched;
+		this.ShowAssetBundleDependencies = directory.ShowAssetBundleDependencies;
 
 		if(this.AssetInfo.Count == directory.AssetInfo.Count)
 		{

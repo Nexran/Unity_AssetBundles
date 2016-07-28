@@ -15,16 +15,22 @@ public class AssetViewerWindow : EditorWindow
 	private static char _smallRightArrowUnicode = '\u25B8';
 	private static float _folderXOffset = 17f;
 	private static string _noFilesOrSubDir = "This folder is empty";
+	private static string _folderDependencies = "Folder Dependencies:";
+	private static string _none = "None";
 
 	private static string _tildeFolderTextureName = "TildeFolderIcon.png";
 	private static string _selectionTextureName = "Title.png";
 	private static string _selectedTextureName = "SelectedTexture.png";
+	private static string _warningTextureName = "Info.png";
+	private static string _fileTextureName = "File.png";
 
 	private static Texture _selectionTexture;
 	private static Texture _selectedTexture;
 	private static Texture _dividerTexture;
 	private static Texture _folderTexture;
 	private static Texture _tildeFolderTexture;
+	private static Texture _warningTexture;
+	private static Texture _fileTexture;
 
 	private List<AssetViewerDirectory> _viewerDirectories = new List<AssetViewerDirectory>();
 	private List<string> _expandedDirectories = new List<string>();
@@ -66,6 +72,8 @@ public class AssetViewerWindow : EditorWindow
 		_selectedTexture = EditorGUIUtility.Load(_selectedTextureName) as Texture;
 		_tildeFolderTexture = EditorGUIUtility.Load(_tildeFolderTextureName) as Texture;
 		_folderTexture = AssetDatabase.GetCachedIcon(_defaultFolderName) as Texture;
+		_warningTexture = EditorGUIUtility.Load(_warningTextureName) as Texture;
+		_fileTexture = EditorGUIUtility.Load(_fileTextureName) as Texture;
 	}
 
 	/// <summary>
@@ -96,8 +104,12 @@ public class AssetViewerWindow : EditorWindow
 		//	mouse position being null means the mouse wasn't pressed down
 		Vector2? leftMousePosition = null;
 		Vector2? rightMousePosition = null;
+		//	store out the mouseDown event because other events can alter the type and switch it to 
+		//	used instead of the proper EventType
+		bool mouseDown = false;
 		if(Event.current.type == EventType.MouseDown)
 		{
+			mouseDown = true;
 			//	adjust for if the user has scrolled the view down the page
 			leftMousePosition = Event.current.mousePosition + _leftScroll;
 			rightMousePosition = Event.current.mousePosition + _rightScroll;
@@ -137,7 +149,16 @@ public class AssetViewerWindow : EditorWindow
 
 					_clearSearchText = true;
 					_currentSearchText = string.Empty;
-					_viewerDirectories[i].IsSelected = true;
+
+					//	on double click attempt to show the asset bundle folder dependencies
+					if(mouseDown == true && Event.current.clickCount == 2)
+					{
+						_viewerDirectories[i].ShowAssetBundleDependencies = true;
+					}
+					else
+					{
+						_viewerDirectories[i].IsSelected = true;
+					}
 				}
 			}
 		}
@@ -332,6 +353,13 @@ public class AssetViewerWindow : EditorWindow
 						}
 
 						Rect lastRect = GUILayoutUtility.GetLastRect();
+
+						//	show a file icon to indicate that there is a manifest with this folder
+						if(_viewerDirectories[i].AssetViewerManifest != null && _fileTexture != null)
+						{
+							GUI.DrawTexture(new Rect(lastRect.width - 16, lastRect.y, 16, 16), _fileTexture);
+						}
+
 						//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
 						//	we check to make sure its a valid size, anything larger than default 
 						if(lastRect.width > 1f)
@@ -381,15 +409,6 @@ public class AssetViewerWindow : EditorWindow
 				GUILayout.Label(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
 				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
 
-				/*
-				if(_viewerDirectories[i].AssetViewerManifest != null)
-				{
-					for(int j = 0; j < _viewerDirectories[i].AssetViewerManifest.Dependencies.Count; ++j)
-					{
-						_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _currentViewWidth, false, EditorStyles.label);
-					}
-				}*/
-
 				//	if there are either sub directories or files to show
 				if(_viewerDirectories[i].AssetInfo != null && _viewerDirectories[i].AssetInfo.Count > 0)
 				{
@@ -400,12 +419,33 @@ public class AssetViewerWindow : EditorWindow
 						if(_viewerDirectories[i].IsSearched == true && _viewerDirectories[i].AssetInfo[j].IsSearched == false)
 							continue;
 						
-						_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _currentViewWidth, false, EditorStyles.label);
+						_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewWidth, false, EditorStyles.label);
 					}
 				}
 				else
 				{
 					GUILayout.Label(_noFilesOrSubDir);
+				}
+			}
+			else if(_viewerDirectories[i].ShowAssetBundleDependencies == true)
+			{
+				//	render the label at the top, with a selection texture behind it
+				//	for examples Assets->AssetsToBundle->Globals
+				GUILayout.Label(_viewerDirectories[i].ProjectPathDisplayName, EditorStyles.boldLabel);
+				if(_selectionTexture != null) GUI.DrawTexture(GUILayoutUtility.GetLastRect(), _selectionTexture);
+
+				GUILayout.Label(_folderDependencies, EditorStyles.boldLabel);
+
+				if(_viewerDirectories[i].AssetViewerManifest != null)
+				{
+					for(int j = 0; j < _viewerDirectories[i].AssetViewerManifest.Dependencies.Count; ++j)
+					{
+						_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewWidth, true, EditorStyles.miniLabel);
+					}
+				}
+				else
+				{
+					GUILayout.Label(_none, EditorStyles.miniLabel);
 				}
 			}
 		}
@@ -424,7 +464,7 @@ public class AssetViewerWindow : EditorWindow
 		GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
 		GUI.SetNextControlName("SearchToolBarField");
 		_currentSearchText = GUILayout.TextField(_currentSearchText, GUI.skin.FindStyle("ToolbarSeachTextField"));
-		if(GUILayout.Button("", GUI.skin.FindStyle("ToolbarSeachCancelButton")))
+		if(GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton")))
 		{
 			_currentSearchText = string.Empty;
 			GUI.FocusControl(null);
@@ -498,6 +538,7 @@ public class AssetViewerWindow : EditorWindow
 		{
 			_viewerDirectories[i].IsSearched = false;
 			_viewerDirectories[i].IsSelected = false;
+			_viewerDirectories[i].ShowAssetBundleDependencies = false;
 			for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
 			{
 				_viewerDirectories[i].AssetInfo[j].IsSearched = false;
@@ -566,7 +607,7 @@ public class AssetViewerWindow : EditorWindow
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
 				//	found one to close!
-				if(_removedDirectories[j] == _viewerDirectories[i].ExpandedParentName )
+				if(_removedDirectories[j] == _viewerDirectories[i].ExpandedParentName)
 				{
 					//	try to destroy and meta files that exist
 					//	meta files are used to show folders in Unity the tilde property ensures meta files are NOT created

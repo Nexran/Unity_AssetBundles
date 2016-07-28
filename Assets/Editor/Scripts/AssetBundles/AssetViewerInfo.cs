@@ -61,7 +61,7 @@ public class AssetViewerInfo
 		}
 	}
 
-	public void Render(Texture selectedTexture, Texture tildeFolderTexture, float currentViewWidth, bool fullName, GUIStyle guiStyle)
+	public void Render(Texture selectedTexture, Texture tildeFolderTexture, Texture warningTexture, float currentViewWidth, bool fullName, GUIStyle guiStyle)
 	{
 		//	if its selected also draw the selection texture 
 		if(IsSelected && selectedTexture != null)
@@ -97,7 +97,13 @@ public class AssetViewerInfo
 		{
 			GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tildeFolderTexture);
 		}
-			
+
+		//	if there are missing components alert the user
+		if(MissingComponents != null && MissingComponents.Count != 0 && warningTexture != null)
+		{
+			GUI.DrawTexture(new Rect(lastRect.width - 16, lastRect.y, 16, 16), warningTexture);
+		}
+
 		//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
 		//	we check to make sure its a valid size, anything larger than default 
 		if(lastRect.width > 1f)
@@ -112,7 +118,7 @@ public class AssetViewerInfo
 		{
 			for(int a = 0; a < Dependencies.Count; ++a)
 			{
-				Dependencies[a].Render(selectedTexture, tildeFolderTexture, currentViewWidth, true, EditorStyles.miniLabel);
+				Dependencies[a].Render(selectedTexture, tildeFolderTexture, warningTexture, currentViewWidth, true, EditorStyles.miniLabel);
 			}
 
 			for(int a = 0; a < MissingComponents.Count; ++a)
