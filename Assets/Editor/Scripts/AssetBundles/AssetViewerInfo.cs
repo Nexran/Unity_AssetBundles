@@ -8,14 +8,12 @@ using UnityEditor;
 /// </summary>
 public class AssetViewerInfo
 {
-	/// <summary>
-	///	calculate the start index to get the length of the project path
-	///	this is used to get where in the local project Asset folder the path is
-	/// </summary>
-	/// <value>The lenght of project path.</value>
-	private static int LenghtOfProjectPath
+	public enum ClickType
 	{
-		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
+		NONE,
+		CLICK,
+		DOUBLE_CLICK,
+		EXPAND
 	}
 
 	public FileSystemInfo FileSystemInfo { get; private set; }
@@ -61,6 +59,44 @@ public class AssetViewerInfo
 		}
 	}
 
+	public AssetViewerInfo.ClickType Click(Vector2 mousePosition)
+	{
+		AssetViewerInfo.ClickType clickType = ClickType.NONE;
+
+		if(SelectionRect.Contains(mousePosition))
+		{
+			//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
+			Object obj = AssetDatabase.LoadAssetAtPath(FileSystemInfo.FullName.RemoveProjectPath(), typeof(Object));
+			if(obj != null) { Selection.activeObject = obj; }
+
+			//	 a user double clicks on the folder 
+			//	select the folder and expand the folder to mimic project folder hierarchy
+			if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
+			{
+				//	if there is no file extension which means its a folder expand it! 
+				if(CanExplore)
+				{
+					IsSelected = false;
+					clickType = ClickType.EXPAND;
+				}
+				else
+				{
+					clickType = ClickType.DOUBLE_CLICK;
+
+					IsSelected = true;
+					if(obj != null) { AssetDatabase.OpenAsset(obj); }
+				}
+			}
+			else
+			{
+				clickType = ClickType.CLICK;
+				 
+				IsSelected = true;
+			}
+		}
+		return clickType;
+	}
+
 	public void Render(Texture selectedTexture, Texture tildeFolderTexture, Texture warningTexture, float currentViewWidth, bool fullName, GUIStyle guiStyle)
 	{
 		//	if its selected also draw the selection texture 
@@ -79,7 +115,7 @@ public class AssetViewerInfo
 		string toShow = string.Empty;
 		if(fullName)
 		{
-			toShow = string.Format("     {0}", FileSystemInfo.FullName.Substring(LenghtOfProjectPath));
+			toShow = string.Format("     {0}", FileSystemInfo.FullName.RemoveProjectPath());
 		}
 		else
 		{
@@ -88,7 +124,7 @@ public class AssetViewerInfo
 
 		GUILayout.Label(toShow, guiStyle);
 		Rect lastRect = GUILayoutUtility.GetLastRect();
-		Texture tex = AssetDatabase.GetCachedIcon(FileSystemInfo.FullName.Substring(LenghtOfProjectPath));
+		Texture tex = AssetDatabase.GetCachedIcon(FileSystemInfo.FullName.RemoveProjectPath());
 		if(tex != null) 
 		{
 			GUI.DrawTexture(new Rect(lastRect.x, lastRect.y, 16, 16), tex);

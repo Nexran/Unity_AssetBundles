@@ -167,22 +167,14 @@ public class AssetViewerWindow : EditorWindow
 		//	and select / highlight the correct path
 		if(rightMousePosition.HasValue)
 		{
-			bool switchDirectory = false;
+		//	bool switchDirectory = false;
+			string folderName = string.Empty;
 
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				if(_viewerDirectories[i].IsSelected == false && _viewerDirectories[i].IsSearched == false)
-					continue;
-
-				for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
-				{				
-					//	if this is toggled we have just switche directories
-					//	we do not care about displaying anymore directories
-					//	just exit out
-					if(switchDirectory == true)
-						return;	
-					
-					if(_viewerDirectories[i].AssetInfo[j].SelectionRect.Contains(rightMousePosition.Value))
+				switch(_viewerDirectories[i].CheckMousePress(rightMousePosition.Value, out folderName))
+				{
+					case AssetViewerInfo.ClickType.CLICK:
 					{
 						//	if we switch one to true lets reset all others sub assets to false
 						for(int a = 0; a < _viewerDirectories.Count; ++a)
@@ -192,56 +184,34 @@ public class AssetViewerWindow : EditorWindow
 								_viewerDirectories[a].AssetInfo[b].IsSelected = false;
 							}
 						}
+					}
+					break;
 
-						//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
-						Object obj = AssetDatabase.LoadAssetAtPath(_viewerDirectories[i].GetProjectPathFileLocation(j), typeof(Object));
-						if(obj != null) { Selection.activeObject = obj; }
+					case AssetViewerInfo.ClickType.EXPAND:
+					{
+						//	reset all serach / selected non-sense
+						ResetViewDirectories();
 
-						//	 a user double clicks on the folder 
-						//	select the folder and expand the folder to mimic project folder hierarchy
-						if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
+						//	clear out the search field
+						_clearSearchText = true;
+						_currentSearchText = string.Empty;
+
+						//	go through and select the correct directory
+						for(int a = 0; a < _viewerDirectories.Count; ++a)
 						{
-							//	if there is no file extension which means its a folder expand it! 
-							if(_viewerDirectories[i].AssetInfo[j].CanExplore)
+							if(_viewerDirectories[i].DependencyDirectories.Contains(_viewerDirectories[a].ExpandedDirectoryName))
 							{
-								//	reset all serach / selected non-sense
-								ResetViewDirectories();
-
-								//	clear out the search field
-								_clearSearchText = true;
-								_currentSearchText = string.Empty;
-								switchDirectory = true;
-
-								_viewerDirectories[i].IsSelected = false;
-								_viewerDirectories[i].IsExpanded = true;
-
-								//	go through and select the correct directory
-								for(int a = 0; a < _viewerDirectories.Count; ++a)
-								{
-									if(_viewerDirectories[i].DependencyDirectories.Contains(_viewerDirectories[a].ExpandedDirectoryName))
-									{
-										_viewerDirectories[a].IsExpanded = true;
-									}
-
-									if(_viewerDirectories[a].ExpandedDirectoryName == _viewerDirectories[i].AssetInfo[j].FolderName)
-									{
-										_viewerDirectories[a].IsSelected = true;
-										break;
-									}
-								}
+								_viewerDirectories[a].IsExpanded = true;
 							}
-							else
+
+							if(_viewerDirectories[a].ExpandedDirectoryName == folderName)
 							{
-								
-								_viewerDirectories[i].AssetInfo[j].IsSelected = true;
-								if(obj != null) { AssetDatabase.OpenAsset(obj); }
+								_viewerDirectories[a].IsSelected = true;
+								break;
 							}
-						}
-						else
-						{
-							_viewerDirectories[i].AssetInfo[j].IsSelected = true;
 						}
 					}
+					break;
 				}
 			}
 		}

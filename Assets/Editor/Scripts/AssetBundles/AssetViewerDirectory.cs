@@ -10,15 +10,6 @@ using UnityEditor;
 /// </summary>
 public class AssetViewerDirectory
 {
-	/// <summary>
-	///	calculate the start index to get the length of the project path
-	///	this is used to get where in the local project Asset folder the path is
-	/// </summary>
-	/// <value>The lenght of project path.</value>
-	private static int LenghtOfProjectPath
-	{
-		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
-	}
 	private static char _smallRightArrowUnicode = '\u25B8';
 		
 	public DirectoryInfo Directory { get; private set; }
@@ -42,7 +33,7 @@ public class AssetViewerDirectory
 	public string ProjectPathDisplayName { get; private set; }
 
 	public int IndentLevel { get; private set; } 
-	public string ProjectPathFolderLocation { get { return Directory.FullName.Substring(LenghtOfProjectPath); } }
+	public string ProjectPathFolderLocation { get { return Directory.FullName.RemoveProjectPath(); } }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="AssetViewerDirectory"/> class.
@@ -103,7 +94,7 @@ public class AssetViewerDirectory
 		{			
 			AssetInfo[i].MissingComponents = new List<string>();
 
-			Object obj = AssetDatabase.LoadAssetAtPath(GetProjectPathFileLocation(i), typeof(Object));
+			Object obj = AssetDatabase.LoadAssetAtPath(AssetInfo[i].FileSystemInfo.FullName.RemoveProjectPath(), typeof(Object));
 			GameObject gObj = obj as GameObject;
 
 			if(gObj != null)
@@ -126,7 +117,7 @@ public class AssetViewerDirectory
 				}
 			}
 
-			string [] dependencies = AssetDatabase.GetDependencies(GetProjectPathFileLocation(i), false);
+			string [] dependencies = AssetDatabase.GetDependencies(AssetInfo[i].FileSystemInfo.FullName.RemoveProjectPath(), false);
 
 			for(int j = 0; j < dependencies.Length; ++j)
 			{
@@ -136,13 +127,13 @@ public class AssetViewerDirectory
 		}
 
 		//	for project path turn all / to -> 
-		ProjectPathDisplayName = ExpandedDirectoryName.Substring(LenghtOfProjectPath).
+		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().
 			Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
 
 		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
 
 		//	set up some offsets to find manifest
-		int assetToBundleOffset = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + LenghtOfProjectPath +  1;
+		int assetToBundleOffset = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + StringExtensions.LengthOfProjectPath +  1;
 		int assetBundleOffset = AssetBundleSettings.Instance.AssetBundleDirectory.Length + 1;
 		string manifestDir = AssetBundleSettings.Instance.AssetBundleDirectory + "/" + 
 			ExpandedDirectoryName.Substring(assetToBundleOffset).ToLower() + 
@@ -153,7 +144,7 @@ public class AssetViewerDirectory
 		{
 			AssetViewerManifest = new AssetViewerManifest(manifestDir, 
 				AssetBundleSettings.Instance.AssetsToBundleDirectory, 
-				LenghtOfProjectPath, 
+				StringExtensions.LengthOfProjectPath, 
 				assetBundleOffset);
 		}
 
@@ -163,22 +154,7 @@ public class AssetViewerDirectory
 			IsExpanded = true;
 		}
 	}
-
-	/// <summary>
-	/// Gets the project path for a file based on the passed in index. 
-	/// </summary>
-	/// <returns>The project path file location.</returns>
-	/// <param name="index">Index.</param>
-	public string GetProjectPathFileLocation(int index)
-	{
-		string projectPathFile = string.Empty;
-		if(AssetInfo != null && AssetInfo.Count != 0)
-		{
-			projectPathFile = AssetInfo[index].FileSystemInfo.FullName.Substring(LenghtOfProjectPath);
-		}
-		return projectPathFile;
-	}
-
+		
 	public void Clone(AssetViewerDirectory directory)
 	{
 		this.IsSelected = directory.IsSelected;
@@ -194,5 +170,29 @@ public class AssetViewerDirectory
 				this.AssetInfo[i].IsSearched = directory.AssetInfo[i].IsSearched;
 			}
 		}
+	}
+
+	public AssetViewerInfo.ClickType CheckMousePress(Vector2 mousePosition, out string folderName)
+	{
+		AssetViewerInfo.ClickType press = AssetViewerInfo.ClickType.NONE;
+		folderName = string.Empty;
+
+		if(IsSelected == false && IsSearched == false)
+			return press;
+
+		for(int j = 0; j < AssetInfo.Count; ++j)
+		{				
+			press = AssetInfo[j].Click(mousePosition);
+
+			if(press == AssetViewerInfo.ClickType.EXPAND)
+			{
+				IsExpanded = true;
+			}
+
+			if(press != AssetViewerInfo.ClickType.NONE)
+				break;
+		}
+			
+		return press;
 	}
 }
