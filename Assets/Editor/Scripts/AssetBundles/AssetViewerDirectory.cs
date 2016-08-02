@@ -182,7 +182,7 @@ public class AssetViewerDirectory
 
 		for(int j = 0; j < AssetInfo.Count; ++j)
 		{				
-			press = AssetInfo[j].Click(mousePosition);
+			press = AssetInfo[j].Click(mousePosition, out folderName);
 
 			if(press == AssetViewerInfo.ClickType.EXPAND)
 			{

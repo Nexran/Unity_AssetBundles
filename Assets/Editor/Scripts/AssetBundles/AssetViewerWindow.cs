@@ -181,7 +181,10 @@ public class AssetViewerWindow : EditorWindow
 						{
 							for(int b = 0; b < _viewerDirectories[a].AssetInfo.Count; ++b)
 							{
-								_viewerDirectories[a].AssetInfo[b].IsSelected = false;
+								if(_viewerDirectories[a].AssetInfo[b].FolderName != folderName)
+								{
+									_viewerDirectories[a].AssetInfo[b].IsSelected = false;
+								}
 							}
 						}
 					}

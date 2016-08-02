@@ -59,12 +59,14 @@ public class AssetViewerInfo
 		}
 	}
 
-	public AssetViewerInfo.ClickType Click(Vector2 mousePosition)
+	public AssetViewerInfo.ClickType Click(Vector2 mousePosition, out string folderName)
 	{
 		AssetViewerInfo.ClickType clickType = ClickType.NONE;
+		folderName = string.Empty;
 
 		if(SelectionRect.Contains(mousePosition))
 		{
+			folderName = FolderName;
 			//	if it has we set it as selected and update the Selection.activeobject so its visible in the inspector
 			Object obj = AssetDatabase.LoadAssetAtPath(FileSystemInfo.FullName.RemoveProjectPath(), typeof(Object));
 			if(obj != null) { Selection.activeObject = obj; }
@@ -90,7 +92,6 @@ public class AssetViewerInfo
 			else
 			{
 				clickType = ClickType.CLICK;
-				 
 				IsSelected = true;
 			}
 		}
