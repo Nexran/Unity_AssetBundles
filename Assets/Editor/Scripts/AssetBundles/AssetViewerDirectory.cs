@@ -40,11 +40,21 @@ public class AssetViewerDirectory
 	/// </summary>
 	/// <param name="directory">Directory to set as base</param>
 	/// <param name="baseIndentCount">Base indent count.</param>
-	public AssetViewerDirectory(DirectoryInfo directory, int baseIndentCount)
-	{
-		Directory = directory;
-		ParentDirectory = directory.Parent;
-		DirectoryInfo [] subDirectories = directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
+	public AssetViewerDirectory(string directoryPath)
+	{ 
+		if(!string.IsNullOrEmpty(directoryPath))
+		{
+			Directory = new DirectoryInfo(directoryPath);
+			if(!Directory.Exists) { throw new DirectoryNotFoundException(); }
+		}
+		else
+		{
+			throw new DirectoryNotFoundException();
+		}
+
+		ParentDirectory = Directory.Parent;
+
+		DirectoryInfo [] subDirectories = Directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
 
 		IsSelected = false;
 		IsExpanded = false;
@@ -52,7 +62,7 @@ public class AssetViewerDirectory
 		ShowAssetBundleDependencies = false;
 
 		//	ignore all files with .meta or .DS_Store
-		FileInfo [] files = directory.GetFiles("*", SearchOption.TopDirectoryOnly).
+		FileInfo [] files = Directory.GetFiles("*", SearchOption.TopDirectoryOnly).
 			Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
 
 		AssetInfo = new List<AssetViewerInfo>();
@@ -67,12 +77,12 @@ public class AssetViewerDirectory
 		}
 			
 		//	set all path names, remove all ~ 
-		ExpandedDirectoryName = directory.FullName.Replace("~", string.Empty);
-		ExpandedParentName = directory.Parent.FullName.Replace("~", string.Empty);
+		ExpandedDirectoryName = Directory.FullName.Replace("~", string.Empty);
+		ExpandedParentName = Directory.Parent.FullName.Replace("~", string.Empty);
 
 		//	set up all dependency directories
 		DependencyDirectories = new List<string>();
-		int countToAdd = baseIndentCount - 1;
+		int countToAdd = 6 - 1;
 		string toAdd = string.Empty;
 		string [] splitPath = ExpandedDirectoryName.Split(Path.DirectorySeparatorChar);
 		//	we make sure the for loop will never add in the last part of the array the object this.jpg
@@ -130,7 +140,7 @@ public class AssetViewerDirectory
 		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().
 			Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
 
-		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - baseIndentCount;
+		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length;
 
 		//	set up some offsets to find manifest
 		int assetToBundleOffset = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + StringExtensions.LengthOfProjectPath +  1;
@@ -149,7 +159,7 @@ public class AssetViewerDirectory
 		}
 
 		//	if they are no tilde subdirectories it means the directory should be expanded by default
-		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")) && !directory.Parent.FullName.Contains("~"))
+		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")) && !Directory.Parent.FullName.Contains("~"))
 		{
 			IsExpanded = true;
 		}

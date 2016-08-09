@@ -15,8 +15,19 @@ public static class StringExtensions
 		get { return Application.dataPath.Remove(Application.dataPath.Length - 6, 6).Length; }
 	}
 
+	/// <summary>
+	/// Removes the project path from the passed in path location. 
+	/// /Users/meh/Unity_AssetBundles/Assets becomes Assets
+	/// </summary>
+	/// <returns>The project path.</returns>
+	/// <param name="path">Path</param>
 	public static string RemoveProjectPath(this string path)
 	{
-		return path.Substring(LengthOfProjectPath);
+		string newString = string.Empty;
+		if(string.IsNullOrEmpty(path) == false && path.Length > LengthOfProjectPath)
+		{
+			newString = path.Substring(LengthOfProjectPath);
+		}
+		return newString;
 	}
 }

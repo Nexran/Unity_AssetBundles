@@ -249,14 +249,14 @@ public class AssetViewerWindow : EditorWindow
 		{
 			_expandedDirectories.Add(directory.FullName);
 		}
-		int baseIndentCount = directory.FullName.Split(Path.DirectorySeparatorChar).Length + 1;
+		int baseIndentCount = AssetBundleSettings.Instance.AssetsToBundleDirectory.Split(Path.DirectorySeparatorChar).Length + 1;
 
 		//	cycle through all directories and create the custom viewer directory
 		//	only add a new directory to the list if it has been modified
 		//	we check to see if its been modified based on its directory name
 		for(int i = 0; i < dirs.Length; ++i)
 		{
-			AssetViewerDirectory viewerDirectory = new AssetViewerDirectory(dirs[i], baseIndentCount);
+			AssetViewerDirectory viewerDirectory = new AssetViewerDirectory(dirs[i].FullName);
 
 			//	if the name has changed it means we need to update it in the list
 			int index = _viewerDirectories.FindIndex(o => o.ExpandedDirectoryName.Equals(viewerDirectory.ExpandedDirectoryName));
