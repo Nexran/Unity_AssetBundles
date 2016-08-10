@@ -42,6 +42,12 @@ public class AssetViewerDirectory
 	/// <param name="baseIndentCount">Base indent count.</param>
 	public AssetViewerDirectory(string directoryPath)
 	{ 
+		IsSearched = false;
+		IsSelected = false;
+		IsExpanded = false;
+		ContainsSubDirectories = false;
+		ShowAssetBundleDependencies = false;
+
 		if(!string.IsNullOrEmpty(directoryPath))
 		{
 			Directory = new DirectoryInfo(directoryPath);
@@ -54,49 +60,46 @@ public class AssetViewerDirectory
 
 		ParentDirectory = Directory.Parent;
 
-		DirectoryInfo [] subDirectories = Directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
+		//	set all path names, remove all ~ 
+		ExpandedDirectoryName = Directory.FullName.Replace("~", string.Empty);
+		ExpandedParentName = Directory.Parent.FullName.Replace("~", string.Empty);
 
-		IsSelected = false;
-		IsExpanded = false;
-		ContainsSubDirectories = false;
-		ShowAssetBundleDependencies = false;
+		//	for project path turn all / to -> 
+		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
+
+		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length;
+	}
+		
+	internal void Init()
+	{
+		InitAssetInfo();
+		InitAssetManifest();
+		InitDependencyDirectories();
+	}
+
+	internal void InitAssetInfo()
+	{
+		AssetInfo = new List<AssetViewerInfo>();
+
+		DirectoryInfo [] subDirectories = Directory.GetDirectories("*", SearchOption.TopDirectoryOnly);
+		for(int i = 0; i < subDirectories.Length; ++i)
+		{
+			if(subDirectories[i].FullName.Contains("~") && !Directory.Parent.FullName.Contains("~"))
+			{
+				IsExpanded = true;
+			}
+
+			ContainsSubDirectories = true;
+			AssetInfo.Add(new AssetViewerInfo(subDirectories[i], subDirectories[i].FullName.Replace("~", string.Empty)));
+		}
 
 		//	ignore all files with .meta or .DS_Store
 		FileInfo [] files = Directory.GetFiles("*", SearchOption.TopDirectoryOnly).
 			Where(o => !o.Name.EndsWith(".meta") && !o.Name.EndsWith(".DS_Store")).ToArray();
 
-		AssetInfo = new List<AssetViewerInfo>();
-		for(int i = 0; i < subDirectories.Length; ++i)
-		{
-			ContainsSubDirectories = true;
-			AssetInfo.Add(new AssetViewerInfo(subDirectories[i], subDirectories[i].FullName.Replace("~", string.Empty)));
-		}
 		for(int i = 0; i < files.Length; ++i)
 		{
 			AssetInfo.Add(new AssetViewerInfo(files[i], files[i].FullName.Replace("~", string.Empty)));
-		}
-			
-		//	set all path names, remove all ~ 
-		ExpandedDirectoryName = Directory.FullName.Replace("~", string.Empty);
-		ExpandedParentName = Directory.Parent.FullName.Replace("~", string.Empty);
-
-		//	set up all dependency directories
-		DependencyDirectories = new List<string>();
-		int countToAdd = 6 - 1;
-		string toAdd = string.Empty;
-		string [] splitPath = ExpandedDirectoryName.Split(Path.DirectorySeparatorChar);
-		//	we make sure the for loop will never add in the last part of the array the object this.jpg
-		for(int j = 0; j < splitPath.Length - 1; ++j)
-		{
-			//	add back the slashes, we skip adding the slash on the first pass
-			if(j != 0) toAdd += Path.DirectorySeparatorChar;
-
-			toAdd += splitPath[j];
-
-			if(j >= countToAdd)
-			{
-				DependencyDirectories.Add(toAdd);
-			}
 		}
 
 		//	set up all the asset info to detect missing components
@@ -135,13 +138,10 @@ public class AssetViewerDirectory
 				AssetInfo[i].Dependencies.Add(new AssetViewerInfo(file, file.FullName.Replace("~", string.Empty)));
 			}
 		}
+	}
 
-		//	for project path turn all / to -> 
-		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().
-			Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
-
-		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length;
-
+	internal void InitAssetManifest()
+	{
 		//	set up some offsets to find manifest
 		int assetToBundleOffset = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + StringExtensions.LengthOfProjectPath +  1;
 		int assetBundleOffset = AssetBundleSettings.Instance.AssetBundleDirectory.Length + 1;
@@ -157,14 +157,34 @@ public class AssetViewerDirectory
 				StringExtensions.LengthOfProjectPath, 
 				assetBundleOffset);
 		}
-
-		//	if they are no tilde subdirectories it means the directory should be expanded by default
-		if(subDirectories != null && !subDirectories.Any(o => o.FullName.Contains("~")) && !Directory.Parent.FullName.Contains("~"))
+		else
 		{
-			IsExpanded = true;
+			throw new FileNotFoundException();
 		}
 	}
-		
+
+	internal void InitDependencyDirectories()
+	{
+		//	set up all dependency directories
+		DependencyDirectories = new List<string>();
+		int countToAdd = Application.dataPath.Split(Path.DirectorySeparatorChar).Length;
+		string toAdd = string.Empty;
+		string [] splitPath = ExpandedDirectoryName.Split(Path.DirectorySeparatorChar);
+		//	we make sure the for loop will never add in the last part of the array the object this.jpg
+		for(int j = 0; j < splitPath.Length - 1; ++j)
+		{
+			//	add back the slashes, we skip adding the slash on the first pass
+			if(j != 0) toAdd += Path.DirectorySeparatorChar;
+
+			toAdd += splitPath[j];
+
+			if(j >= countToAdd)
+			{
+				DependencyDirectories.Add(toAdd.RemoveProjectPath());
+			}
+		}
+	}
+
 	public void Clone(AssetViewerDirectory directory)
 	{
 		this.IsSelected = directory.IsSelected;
