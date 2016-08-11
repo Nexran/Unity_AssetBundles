@@ -11,7 +11,9 @@ using UnityEditor;
 public class AssetViewerDirectory
 {
 	private static char _smallRightArrowUnicode = '\u25B8';
-		
+	private static float _folderXOffset = 17f;
+	private static int _indentLevelBase = 7;
+
 	public DirectoryInfo Directory { get; private set; }
 	public DirectoryInfo ParentDirectory { get; private set; }
 
@@ -67,7 +69,7 @@ public class AssetViewerDirectory
 		//	for project path turn all / to -> 
 		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
 
-		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length;
+		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - _indentLevelBase;
 	}
 		
 	internal void Init()
@@ -157,10 +159,6 @@ public class AssetViewerDirectory
 				StringExtensions.LengthOfProjectPath, 
 				assetBundleOffset);
 		}
-		else
-		{
-			throw new FileNotFoundException();
-		}
 	}
 
 	internal void InitDependencyDirectories()
@@ -185,7 +183,7 @@ public class AssetViewerDirectory
 		}
 	}
 
-	public void Clone(AssetViewerDirectory directory)
+	internal void CloneFlags(AssetViewerDirectory directory)
 	{
 		this.IsSelected = directory.IsSelected;
 		this.IsExpanded = directory.IsExpanded;
@@ -202,7 +200,63 @@ public class AssetViewerDirectory
 		}
 	}
 
-	public AssetViewerInfo.ClickType CheckMousePress(Vector2 mousePosition, out string folderName)
+	internal void Render(string expandedDirectoryName, Texture selectedTexture, Texture folderTexture, Texture fileTexture)
+	{
+		if(ExpandedParentName == expandedDirectoryName)
+		{
+			GUILayout.BeginHorizontal();
+
+			//	if its selected also draw the selection texture
+			//	draw this first so the label/ foldout / image are rendered over
+			if(IsSelected && selectedTexture != null)
+			{
+				GUI.DrawTexture(SelectionRect, selectedTexture);
+			}
+
+			//	show a foldout if the directory has sub directories
+			//	we add in extra spaces for the folder to be placed inbetween
+			if(ContainsSubDirectories)
+			{
+				IsExpanded = EditorGUILayout.Foldout(IsExpanded, string.Format("      {0}", Directory.Name));
+			}
+			else
+			{
+				EditorGUILayout.LabelField(string.Format("          {0}", Directory.Name));
+			}
+
+			Rect lastRect = GUILayoutUtility.GetLastRect();
+
+			//	show a file icon to indicate that there is a manifest with this folder
+			if(AssetViewerManifest != null && fileTexture != null)
+			{
+				GUI.DrawTexture(new Rect(lastRect.width - 16, lastRect.y, 16, 16), fileTexture);
+			}
+
+			//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
+			//	we check to make sure its a valid size, anything larger than default 
+			if(lastRect.width > 1f)
+			{
+				SelectionRect = new Rect(0, lastRect.y, lastRect.width + lastRect.x, lastRect.height);
+			}
+
+			//	render the folder texture
+			Rect folderRect = EditorGUI.IndentedRect(lastRect);
+			float folderOffset = (folderRect.x - lastRect.x) + _folderXOffset;
+			Texture tex = AssetDatabase.GetCachedIcon(ProjectPathFolderLocation);
+			if(tex != null) 
+			{
+				GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), tex);
+			}
+			else if(folderTexture != null)
+			{
+				GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), folderTexture);
+			}
+
+			GUILayout.EndHorizontal();
+		}
+	}
+
+	internal AssetViewerInfo.ClickType CheckMousePress(Vector2 mousePosition, out string folderName)
 	{
 		AssetViewerInfo.ClickType press = AssetViewerInfo.ClickType.NONE;
 		folderName = string.Empty;
@@ -224,5 +278,52 @@ public class AssetViewerDirectory
 		}
 			
 		return press;
+	}
+
+	internal void OpenDirectory()
+	{
+		//	found one to open!
+		if(Directory.FullName.Contains("~"))
+		{
+			string newPath = Directory.FullName.Replace("~", string.Empty);
+
+			bool exists = System.IO.Directory.Exists(newPath);
+
+			if(exists == false && Directory.Exists)
+			{
+				Directory.MoveTo(newPath);
+			}
+		}
+	}
+
+	internal bool CloseDirectory()
+	{
+		bool directoryClosed = false;
+
+		//	try to destroy and meta files that exist
+		//	meta files are used to show folders in Unity the tilde property ensures meta files are NOT created
+		//	if we did not destroy all meta files here if you close a folder at the top of a directory all the meta files
+		//	will not get destroyed which will cause errors to pop up in the editor
+		FileInfo metaFile = new FileInfo(Directory.FullName + ".meta");
+		if(metaFile != null && metaFile.Exists == true)
+		{
+			metaFile.Delete();
+		}
+
+		//	if it already ends with a tilde don't add another!
+		if(Directory.FullName.EndsWith("~") == false)
+		{
+			string newPath = Directory.FullName + "~";
+			bool exists = System.IO.Directory.Exists(newPath);
+
+			if(exists == false)
+			{
+				Directory.MoveTo(newPath);
+				directoryClosed = true;
+			}
+		}
+		IsExpanded = false;
+
+		return directoryClosed;
 	}
 }

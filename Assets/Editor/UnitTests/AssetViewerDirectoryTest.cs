@@ -8,21 +8,24 @@ using System.IO;
 internal class AssetViewerDirectoryTest 
 {
 	private string _testDirectory = Application.dataPath + "/Editor/UnitTests/Test";
-	private string _subDirectory = Application.dataPath + "/Editor/UnitTests/Test/Subdirectory";
+	private string _openDirectory = Application.dataPath + "/Editor/UnitTests/Test/Open";
+	private string _closedDirectory = Application.dataPath + "/Editor/UnitTests/Test/~Closed";
 
 	[TestFixtureSetUp]
 	public void Init()
 	{
 		Debug.Log("setup");
 		Directory.CreateDirectory(_testDirectory);
-		Directory.CreateDirectory(_subDirectory);
+		Directory.CreateDirectory(_openDirectory);
+		Directory.CreateDirectory(_closedDirectory);
 	}
 
 	[TestFixtureTearDown]
 	public void Destroy()
 	{
 		Debug.Log("TearDown");
-		if(Directory.Exists(_subDirectory)) Directory.Delete(_subDirectory);
+		if(Directory.Exists(_openDirectory)) Directory.Delete(_openDirectory);
+		if(Directory.Exists(_closedDirectory)) Directory.Delete(_closedDirectory);
 		if(Directory.Exists(_testDirectory)) Directory.Delete(_testDirectory);
 	}
 
@@ -43,16 +46,17 @@ internal class AssetViewerDirectoryTest
 		AssetViewerDirectory dir = new AssetViewerDirectory(_testDirectory);
 		dir.InitAssetInfo();
 
-		Assert.True(dir.ContainsSubDirectories);
+		Assert.That(dir.ContainsSubDirectories);
 	}
 
 	[Test]
-	[ExpectedException(typeof(FileNotFoundException), ExpectedMessage = "Unable to find the specified file.")]
 	public void InitAssetManifest()
 	{
 		//	test null 
 		AssetViewerDirectory dir = new AssetViewerDirectory(_testDirectory);
 		dir.InitAssetManifest();
+
+		Assert.That(dir.AssetViewerManifest == null);
 	}
 
 	[Test]
@@ -63,5 +67,27 @@ internal class AssetViewerDirectoryTest
 
 		Assert.AreEqual(dir.DependencyDirectories[0], "Assets/Editor");
 		Assert.AreEqual(dir.DependencyDirectories[1], "Assets/Editor/UnitTests");
+	}
+
+	[Test]
+	public void OpenDirectory()
+	{
+		AssetViewerDirectory dir = new AssetViewerDirectory(_closedDirectory);
+		dir.Init();
+
+		dir.OpenDirectory();
+
+		Assert.That(dir.Directory.FullName.Contains("~"));
+	}
+
+	[Test]
+	public void CloseDirectory()
+	{
+		AssetViewerDirectory dir = new AssetViewerDirectory(_openDirectory);
+		dir.Init();
+
+		dir.CloseDirectory();
+
+		Assert.That(!dir.Directory.FullName.Contains("~"));
 	}
 }

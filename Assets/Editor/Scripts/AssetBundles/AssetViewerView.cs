@@ -5,15 +5,14 @@ using System.IO;
 using System.Linq;
 	
 /// <summary>
-/// Asset viewer window, shows all directories that are listed under the Asset To Bundle Directory set in Asset Bundle Settings.
+/// Asset viewer view, shows all directories that are listed under the Asset To Bundle Directory set in Asset Bundle Settings.
 /// </summary>
-public class AssetViewerWindow : EditorWindow
+public class AssetViewerView : EditorWindow
 {
 	private static string _windowName = "Asset Viewer";
 	private static string _defaultFolderName = "Assets";
 	private static float _dividerWidth = 2f;
 	private static char _smallRightArrowUnicode = '\u25B8';
-	private static float _folderXOffset = 17f;
 	private static string _noFilesOrSubDir = "This folder is empty";
 	private static string _folderDependencies = "Folder Dependencies:";
 	private static string _none = "None";
@@ -58,7 +57,7 @@ public class AssetViewerWindow : EditorWindow
 	[MenuItem("Custom/Asset Viewer")]
 	public static void ShowWindow()
 	{
-		GetWindow<AssetViewerWindow>(_windowName);
+		GetWindow<AssetViewerView>(_windowName);
 	}
 
 	/// <summary>
@@ -249,7 +248,6 @@ public class AssetViewerWindow : EditorWindow
 		{
 			_expandedDirectories.Add(directory.FullName);
 		}
-		int baseIndentCount = AssetBundleSettings.Instance.AssetsToBundleDirectory.Split(Path.DirectorySeparatorChar).Length + 1;
 
 		//	cycle through all directories and create the custom viewer directory
 		//	only add a new directory to the list if it has been modified
@@ -257,6 +255,7 @@ public class AssetViewerWindow : EditorWindow
 		for(int i = 0; i < dirs.Length; ++i)
 		{
 			AssetViewerDirectory viewerDirectory = new AssetViewerDirectory(dirs[i].FullName);
+			viewerDirectory.Init();
 
 			//	if the name has changed it means we need to update it in the list
 			int index = _viewerDirectories.FindIndex(o => o.ExpandedDirectoryName.Equals(viewerDirectory.ExpandedDirectoryName));
@@ -266,7 +265,7 @@ public class AssetViewerWindow : EditorWindow
 			}
 			else
 			{
-				viewerDirectory.Clone(_viewerDirectories[index]);
+				viewerDirectory.CloneFlags(_viewerDirectories[index]);
 				_viewerDirectories.RemoveAt(index);
 				_viewerDirectories.Insert(index, viewerDirectory);
 			}
@@ -302,59 +301,7 @@ public class AssetViewerWindow : EditorWindow
 				//	now we check all expanded directories if its expanded we show it!
 				for(int j = 0; j < _expandedDirectories.Count; ++j)
 				{
-					if(_viewerDirectories[i].ExpandedParentName == _expandedDirectories[j])
-					{
-						GUILayout.BeginHorizontal();
-
-						//	if its selected also draw the selection texture
-						//	draw this first so the label/ foldout / image are rendered over
-						if(_viewerDirectories[i].IsSelected && _selectedTexture != null)
-						{
-							GUI.DrawTexture(_viewerDirectories[i].SelectionRect, _selectedTexture);
-						}
-
-						//	show a foldout if the directory has sub directories
-						//	we add in extra spaces for the folder to be placed inbetween
-						if(_viewerDirectories[i].ContainsSubDirectories)
-						{
-							_viewerDirectories[i].IsExpanded = EditorGUILayout.Foldout(_viewerDirectories[i].IsExpanded,
-								string.Format("      {0}", _viewerDirectories[i].Directory.Name));
-						}
-						else
-						{
-							EditorGUILayout.LabelField(string.Format("          {0}", _viewerDirectories[i].Directory.Name));
-						}
-
-						Rect lastRect = GUILayoutUtility.GetLastRect();
-
-						//	show a file icon to indicate that there is a manifest with this folder
-						if(_viewerDirectories[i].AssetViewerManifest != null && _fileTexture != null)
-						{
-							GUI.DrawTexture(new Rect(lastRect.width - 16, lastRect.y, 16, 16), _fileTexture);
-						}
-
-						//	for X reason the rect Width will sometimes give us default values of 0, 0, 1, 1
-						//	we check to make sure its a valid size, anything larger than default 
-						if(lastRect.width > 1f)
-						{
-							_viewerDirectories[i].SelectionRect = new Rect(0, lastRect.y, lastRect.width + lastRect.x, lastRect.height);
-						}
-
-						//	render the folder texture
-						Rect folderRect = EditorGUI.IndentedRect(lastRect);
-						float folderOffset = (folderRect.x - lastRect.x) + _folderXOffset;
-						Texture tex = AssetDatabase.GetCachedIcon(_viewerDirectories[i].ProjectPathFolderLocation);
-						if(tex != null) 
-						{
-							GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), tex);
-						}
-						else if(_folderTexture != null)
-						{
-							GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), _folderTexture);
-						}
-
-						GUILayout.EndHorizontal();
-					}
+					_viewerDirectories[i].Render(_expandedDirectories[j], _selectionTexture, _folderTexture, _fileTexture);
 				}
 			}
 		}
@@ -553,18 +500,7 @@ public class AssetViewerWindow : EditorWindow
 			{
 				if(_openedDirectories[j] == _viewerDirectories[i].ExpandedParentName)
 				{
-					//	found one to open!
-					if(_viewerDirectories[i].Directory.FullName.Contains("~"))
-					{
-						string newPath = _viewerDirectories[i].Directory.FullName.Replace("~", string.Empty);
-
-						bool exists = Directory.Exists(newPath);
-
-						if(exists == false && _viewerDirectories[i].Directory.Exists)
-						{
-							_viewerDirectories[i].Directory.MoveTo(newPath);
-						}
-					}
+					_viewerDirectories[i].OpenDirectory();
 				}
 			}
 			//	re-init every directory if multiple directories just opened
@@ -582,29 +518,10 @@ public class AssetViewerWindow : EditorWindow
 				//	found one to close!
 				if(_removedDirectories[j] == _viewerDirectories[i].ExpandedParentName)
 				{
-					//	try to destroy and meta files that exist
-					//	meta files are used to show folders in Unity the tilde property ensures meta files are NOT created
-					//	if we did not destroy all meta files here if you close a folder at the top of a directory all the meta files
-					//	will not get destroyed which will cause errors to pop up in the editor
-					FileInfo metaFile = new FileInfo(_viewerDirectories[i].Directory.FullName + ".meta");
-					if(metaFile != null && metaFile.Exists == true)
+					if(_viewerDirectories[i].CloseDirectory())
 					{
-						metaFile.Delete();
+						updated = true;
 					}
-
-					//	if it already ends with a tilde don't add another!
-					if(_viewerDirectories[i].Directory.FullName.EndsWith("~") == false)
-					{
-						string newPath = _viewerDirectories[i].Directory.FullName + "~";
-						bool exists = Directory.Exists(newPath);
-
-						if(exists == false)
-						{
-							_viewerDirectories[i].Directory.MoveTo(newPath);
-							updated = true;
-						}
-					}
-					_viewerDirectories[i].IsExpanded = false;
 				}
 			}
 		}
