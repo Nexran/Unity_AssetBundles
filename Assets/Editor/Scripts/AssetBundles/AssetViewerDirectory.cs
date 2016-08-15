@@ -12,7 +12,6 @@ public class AssetViewerDirectory
 {
 	private static char _smallRightArrowUnicode = '\u25B8';
 	private static float _folderXOffset = 17f;
-	private static int _indentLevelBase = 7;
 
 	public DirectoryInfo Directory { get; private set; }
 	public DirectoryInfo ParentDirectory { get; private set; }
@@ -35,7 +34,6 @@ public class AssetViewerDirectory
 	public string ProjectPathDisplayName { get; private set; }
 
 	public int IndentLevel { get; private set; } 
-	public string ProjectPathFolderLocation { get { return Directory.FullName.RemoveProjectPath(); } }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="AssetViewerDirectory"/> class.
@@ -69,7 +67,10 @@ public class AssetViewerDirectory
 		//	for project path turn all / to -> 
 		ProjectPathDisplayName = ExpandedDirectoryName.RemoveProjectPath().Replace(Path.DirectorySeparatorChar, _smallRightArrowUnicode);
 
-		IndentLevel = Directory.FullName.Split(Path.DirectorySeparatorChar).Length - _indentLevelBase;
+		//	calculate out indent levels 
+		int indentRemoveLength = AssetBundleSettings.Instance.AssetsToBundleDirectory.Length + StringExtensions.LengthOfProjectPath;
+		string indentString = Directory.FullName.Remove(0, indentRemoveLength + 1);
+		IndentLevel = indentString.Split(Path.DirectorySeparatorChar).Length - 1;
 	}
 		
 	internal void Init()
@@ -221,7 +222,7 @@ public class AssetViewerDirectory
 			}
 			else
 			{
-				EditorGUILayout.LabelField(string.Format("          {0}", Directory.Name));
+				EditorGUILayout.LabelField(string.Format("         {0}", Directory.Name));
 			}
 
 			Rect lastRect = GUILayoutUtility.GetLastRect();
@@ -242,7 +243,7 @@ public class AssetViewerDirectory
 			//	render the folder texture
 			Rect folderRect = EditorGUI.IndentedRect(lastRect);
 			float folderOffset = (folderRect.x - lastRect.x) + _folderXOffset;
-			Texture tex = AssetDatabase.GetCachedIcon(ProjectPathFolderLocation);
+			Texture tex = AssetDatabase.GetCachedIcon(Directory.FullName.RemoveProjectPath());
 			if(tex != null) 
 			{
 				GUI.DrawTexture(new Rect(folderOffset, lastRect.y, 16, 16), tex);
