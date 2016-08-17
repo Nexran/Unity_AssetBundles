@@ -3,6 +3,10 @@ using UnityEditor;
 
 namespace FrameworkEditor
 {	
+	/// <summary>
+	/// Split editor view, used for windows that need to display information on two different parts of a window.
+	/// Shows split either HORIZONTAL or VERTICAL with a divider that the user can position.
+	/// </summary>
 	public class SplitEditorView : BaseEditorView
 	{
 		protected enum SplitType
@@ -20,9 +24,13 @@ namespace FrameworkEditor
 
 		private bool _isResizing;
 		private Rect _dividerRect;
+		private Rect _windowRect;
 
-		protected float _currentViewWidth;
 		protected EventType _eventType;
+		protected Vector2 _mousePosition;
+		protected int _clickCount;
+
+		protected float _currentViewSize;
 		protected SplitType _splitType;
 
 		/// <summary>
@@ -33,29 +41,9 @@ namespace FrameworkEditor
 			base.OnEnable();
 
 			_dividerTexture = EditorGUIUtility.Load(_dividerTextureName) as Texture;
+			_windowRect = this.position;
 		}
-
-		/// <summary>
-		/// Unity function OnFocus, Called when the window gets keyboard focus.
-		/// </summary>
-		internal override void OnFocus()
-		{
-			base.OnFocus();
-
-			_isResizing = false;
-
-			if(_splitType == SplitType.VERTICAL)
-			{
-				_currentViewWidth = this.position.height / 2;
-				_dividerRect = new Rect(0, _currentViewWidth, this.position.width, _dividerSize);
-			}
-			else
-			{
-				_currentViewWidth = this.position.width / 2;
-				_dividerRect = new Rect(_currentViewWidth, 0, _dividerSize, this.position.height);
-			}
-		}
-
+			
 		/// <summary>
 		/// Unity function OnGUI, might be called several times per frame (one call per event). 
 		/// </summary>
@@ -63,20 +51,11 @@ namespace FrameworkEditor
 		{
 			base.OnGUI();
 
-			//	calculate mouse position before any other part due to other logic potentially 
-			//	altering the mouse position and setting the Event.current.type to USED instead of Mouse Down
-			//	mouse position being null means the mouse wasn't pressed down
-			Vector2? oneMousePosition = null;
-			Vector2? twoMousePosition = null;
-			//	store out the mouseDown event because other events can alter the type and switch it to 
-			//	used instead of the proper EventType
+			//	EVENT data is only available in OnGUI store out event data
+			//	used in Update methods
 			_eventType = Event.current.type;
-			if(_eventType == EventType.MouseDown)
-			{
-				//	adjust for if the user has scrolled the view down the page
-				oneMousePosition = Event.current.mousePosition + _viewOneScroll;
-				twoMousePosition = Event.current.mousePosition + _viewTwoScroll;
-			}
+			_mousePosition = Event.current.mousePosition;
+			_clickCount = Event.current.clickCount;
 
 			if(_splitType == SplitType.VERTICAL)
 			{
@@ -87,14 +66,14 @@ namespace FrameworkEditor
 				GUILayout.BeginHorizontal();
 			}
 
-			//	view One, set the width otherwise it will change based on current selection
+			//	view One, set the WIDTH|HEIGHT otherwise it will change based on current selection
 			if(_splitType == SplitType.VERTICAL)
 			{				
-				_viewOneScroll = GUILayout.BeginScrollView(_viewOneScroll, false, false, GUILayout.Height(_currentViewWidth));
+				_viewOneScroll = GUILayout.BeginScrollView(_viewOneScroll, false, false, GUILayout.Height(_currentViewSize));
 			}
 			else
 			{
-				_viewOneScroll = GUILayout.BeginScrollView(_viewOneScroll, false, false, GUILayout.Width(_currentViewWidth));
+				_viewOneScroll = GUILayout.BeginScrollView(_viewOneScroll, false, false, GUILayout.Width(_currentViewSize));
 			}
 			RenderViewOne();
 			GUILayout.EndScrollView();
@@ -114,18 +93,35 @@ namespace FrameworkEditor
 			{
 				GUILayout.EndHorizontal();
 			}
+		}
 
+		/// <summary>
+		/// Unity function Update.
+		/// </summary>				
+		internal override void Update() 
+		{
+			base.Update();
 
-			//	check to see if the left side of the screen has a mouse press 
-			if(oneMousePosition.HasValue)
+			if(_eventType == EventType.MouseDown)
 			{
-				HandleInputViewOne(oneMousePosition.Value);
+				HandleInputViewOne(_mousePosition + _viewOneScroll);
+				HandleInputViewTwo(_mousePosition + _viewTwoScroll);
 			}
+		}
 
-			//	check to see if the right side of the screen has a mouse press 
-			if(twoMousePosition.HasValue)
+		/// <summary>
+		/// Unity function OnInspectorUpdate is called at 10 frames per second to give the inspector a chance to update.
+		/// Unity recommends all Repaints to occur in this.
+		/// </summary>
+		internal override void OnInspectorUpdate() 
+		{
+			base.OnInspectorUpdate();
+				
+			UpdateDivider();
+
+			if(this.position != _windowRect)
 			{
-				HandleInputViewTwo(twoMousePosition.Value);
+				WindowRectChanged();
 			}
 		}
 
@@ -150,37 +146,70 @@ namespace FrameworkEditor
 		}
 
 		/// <summary>
-		/// Renders the divider, based on how the screen is positioned and updates the split view display.
+		/// Called when the size of the window changes. 
+		/// </summary>
+		private void WindowRectChanged()
+		{
+			InitDivider();
+		}
+
+		/// <summary>
+		/// Inits the divider, sets up all base variables for the divider.
+		/// </summary>
+		private void InitDivider()
+		{
+			_windowRect = this.position;
+			_isResizing = false;
+
+			if(_splitType == SplitType.VERTICAL)
+			{
+				_currentViewSize = _windowRect.height / 2;
+				_dividerRect = new Rect(0, _currentViewSize, _windowRect.width, _dividerSize);
+			}
+			else
+			{
+				_currentViewSize = _windowRect.width / 2;
+				_dividerRect = new Rect(_currentViewSize, 0, _dividerSize, _windowRect.height);
+			}
+		}
+
+		/// <summary>
+		/// Renders the divider, based on how the screen is positioned.
 		/// </summary>
 		private void RenderDivider()
 		{
-			if(_eventType == EventType.mouseDown && _dividerRect.Contains(Event.current.mousePosition))
+			if(_dividerTexture != null) { GUI.DrawTexture(_dividerRect, _dividerTexture); }
+			EditorGUIUtility.AddCursorRect(_dividerRect, (_splitType == SplitType.VERTICAL) ? MouseCursor.ResizeVertical : MouseCursor.ResizeHorizontal);
+		}
+
+		/// <summary>
+		/// Updates the divider, based on mouse and sets the new divider rect based on user input.
+		/// </summary>
+		private void UpdateDivider()
+		{
+			if(_eventType == EventType.MouseDown && _dividerRect.Contains(_mousePosition))
 			{
 				_isResizing = true;
+			}
+			else if(_eventType == EventType.MouseUp)
+			{
+				_isResizing = false;
 			}
 
 			if(_isResizing)
 			{
 				if(_splitType == SplitType.VERTICAL)
 				{
-					_currentViewWidth = Event.current.mousePosition.y;
-					_dividerRect.Set(_dividerRect.x, _currentViewWidth, _dividerRect.width, _dividerRect.height);
+					_currentViewSize = _mousePosition.y;
+					_dividerRect.Set(_dividerRect.x, _currentViewSize, _dividerRect.width, _dividerRect.height);
 				}
 				else
 				{
-					_currentViewWidth = Event.current.mousePosition.x;
-					_dividerRect.Set(_currentViewWidth, _dividerRect.y, _dividerRect.width, _dividerRect.height);
+					_currentViewSize = _mousePosition.x;
+					_dividerRect.Set(_currentViewSize, _dividerRect.y, _dividerRect.width, _dividerRect.height);
 				}
 			}
 
-			if(_eventType == EventType.MouseUp)
-			{
-				_isResizing = false;        
-			}
-
-			MouseCursor mouseCursor = (_splitType == SplitType.VERTICAL) ? MouseCursor.ResizeVertical : MouseCursor.ResizeHorizontal;
-			if(_dividerTexture != null) { GUI.DrawTexture(_dividerRect, _dividerTexture); }
-			EditorGUIUtility.AddCursorRect(_dividerRect, mouseCursor);
 		}
 	}
 }

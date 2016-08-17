@@ -3,6 +3,9 @@ using UnityEditor;
 
 namespace FrameworkEditor
 {	
+	/// <summary>
+	/// Base editor view, default standard editor window view.
+	/// </summary>
 	public class BaseEditorView : EditorWindow
 	{
 		/// <summary>
@@ -29,7 +32,15 @@ namespace FrameworkEditor
 				RepaintLayoutGUI();
 			}
 		}
-			
+
+		/// <summary>
+		/// Unity function Update.
+		/// </summary>
+		internal virtual void Update()
+		{
+
+		}
+
 		/// <summary>
 		/// Unity function OnInspectorUpdate is called at 10 frames per second to give the inspector a chance to update.
 		/// Unity recommends all Repaints to occur in this.

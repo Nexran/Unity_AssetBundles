@@ -149,7 +149,7 @@ namespace FrameworkEditor
 							if(_viewerDirectories[i].IsSearched == true && _viewerDirectories[i].AssetInfo[j].IsSearched == false)
 								continue;
 
-							_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewWidth, false, EditorStyles.label);
+							_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewSize, false, EditorStyles.label);
 						}
 					}
 					else
@@ -170,7 +170,7 @@ namespace FrameworkEditor
 					{
 						for(int j = 0; j < _viewerDirectories[i].AssetViewerManifest.Dependencies.Count; ++j)
 						{
-							_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewWidth, true, EditorStyles.miniLabel);
+							_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewSize, true, EditorStyles.miniLabel);
 						}
 					}
 					else
@@ -197,7 +197,7 @@ namespace FrameworkEditor
 					_currentSearchText = string.Empty;
 
 					//	on double click attempt to show the asset bundle folder dependencies
-					if(_eventType == EventType.MouseDown && Event.current.clickCount == 2)
+					if(_eventType == EventType.MouseDown && _clickCount == 2)
 					{
 						_viewerDirectories[i].ShowAssetBundleDependencies = true;
 					}
