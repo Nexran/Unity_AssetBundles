@@ -257,7 +257,7 @@ public class AssetViewerDirectory
 		}
 	}
 
-	internal AssetViewerInfo.ClickType CheckMousePress(Vector2 mousePosition, out string folderName)
+	internal AssetViewerInfo.ClickType CheckMousePress(EventType eventType, int clickCount, Vector2 mousePosition, out string folderName)
 	{
 		AssetViewerInfo.ClickType press = AssetViewerInfo.ClickType.NONE;
 		folderName = string.Empty;
@@ -267,7 +267,7 @@ public class AssetViewerDirectory
 
 		for(int j = 0; j < AssetInfo.Count; ++j)
 		{				
-			press = AssetInfo[j].Click(mousePosition, out folderName);
+			press = AssetInfo[j].Click(eventType, clickCount, mousePosition, out folderName);
 
 			if(press == AssetViewerInfo.ClickType.EXPAND)
 			{

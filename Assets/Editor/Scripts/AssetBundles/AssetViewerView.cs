@@ -35,10 +35,7 @@ namespace FrameworkEditor
 		private Rect _selectionRect;
 		private string _directoryDisplayName;
 
-		private string _searchText;
-		private string _currentSearchText = string.Empty;
-		private bool _searchTextChanged;
-		private bool _clearSearchText;
+		private SearchBarView _searchBar;
 
 		/// <summary>
 		/// Shows the window.
@@ -56,6 +53,9 @@ namespace FrameworkEditor
 		{
 			base.OnEnable();
 
+			_searchBar = new SearchBarView();
+			_searchBar.OnSearchChanged += SearchChanged;
+
 			//	this searches in the default folder Editor Default Resources for the texture
 			_selectionTexture = EditorGUIUtility.Load(_selectionTextureName) as Texture;
 			_selectedTexture = EditorGUIUtility.Load(_selectedTextureName) as Texture;
@@ -70,7 +70,7 @@ namespace FrameworkEditor
 		/// </summary>
 		internal override void OnFocus()
 		{
-			_splitType = SplitType.HORIZONTAL;
+			SetSplitViewType(SplitType.HORIZONTAL);
 
 			base.OnFocus();
 
@@ -84,6 +84,13 @@ namespace FrameworkEditor
 			InitViewerWindow();
 		}
 
+		internal override void Update()
+		{
+			base.Update();
+
+			_searchBar.Update();
+		}
+
 		/// <summary>
 		/// Unity function OnGUI, might be called several times per frame (one call per event). 
 		/// </summary>
@@ -94,12 +101,12 @@ namespace FrameworkEditor
 			if(AssetBundleSettings.Instance == null)
 				return;
 
-			RenderSearchArea();
+			_searchBar.Render();
 		}
 
-		internal override void RenderViewOne()
+		internal override void RenderViewOne(float viewSize)
 		{
-			base.RenderViewOne();
+			base.RenderViewOne(viewSize);
 
 			if(_viewerDirectories != null)
 			{
@@ -125,9 +132,9 @@ namespace FrameworkEditor
 			EditorGUI.indentLevel = 0;
 		}
 
-		internal override void RenderViewTwo()
+		internal override void RenderViewTwo(float viewSize)
 		{
-			base.RenderViewTwo();
+			base.RenderViewTwo(viewSize);
 
 			//	cycle through and show all files and subdirectories of the currently selected viewerDirectory
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
@@ -149,7 +156,7 @@ namespace FrameworkEditor
 							if(_viewerDirectories[i].IsSearched == true && _viewerDirectories[i].AssetInfo[j].IsSearched == false)
 								continue;
 
-							_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewSize, false, EditorStyles.label);
+							_viewerDirectories[i].AssetInfo[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, viewSize, false, EditorStyles.label);
 						}
 					}
 					else
@@ -170,7 +177,7 @@ namespace FrameworkEditor
 					{
 						for(int j = 0; j < _viewerDirectories[i].AssetViewerManifest.Dependencies.Count; ++j)
 						{
-							_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, _currentViewSize, true, EditorStyles.miniLabel);
+							_viewerDirectories[i].AssetViewerManifest.Dependencies[j].Render(_selectedTexture, _tildeFolderTexture, _warningTexture, viewSize, true, EditorStyles.miniLabel);
 						}
 					}
 					else
@@ -181,9 +188,9 @@ namespace FrameworkEditor
 			}
 		}
 
-		internal override void HandleInputViewOne(Vector2 mousePosition)
+		internal override void HandleInputViewOne(Vector2 mousePosition, EventType eventType, int clickCount)
 		{
-			base.HandleInputViewOne(mousePosition);
+			base.HandleInputViewOne(mousePosition, eventType, clickCount);
 
 			//	cycle through all directories and check to see if a directory has been clicked on
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
@@ -193,11 +200,10 @@ namespace FrameworkEditor
 					//	if we switch one to true lets reset all others to false
 					ResetViewDirectories();
 
-					_clearSearchText = true;
-					_currentSearchText = string.Empty;
+					_searchBar.Clear();
 
 					//	on double click attempt to show the asset bundle folder dependencies
-					if(_eventType == EventType.MouseDown && _clickCount == 2)
+					if(eventType == EventType.MouseDown && clickCount == 2)
 					{
 						_viewerDirectories[i].ShowAssetBundleDependencies = true;
 					}
@@ -209,16 +215,16 @@ namespace FrameworkEditor
 			}
 		}
 
-		internal override void HandleInputViewTwo(Vector2 mousePosition)
+		internal override void HandleInputViewTwo(Vector2 mousePosition, EventType eventType, int clickCount)
 		{
-			base.HandleInputViewTwo(mousePosition);
+			base.HandleInputViewTwo(mousePosition, eventType, clickCount);
 
 			//	bool switchDirectory = false;
 			string folderName = string.Empty;
 
 			for(int i = 0; i < _viewerDirectories.Count; ++i)
 			{
-				switch(_viewerDirectories[i].CheckMousePress(mousePosition, out folderName))
+				switch(_viewerDirectories[i].CheckMousePress(eventType, clickCount, mousePosition, out folderName))
 				{
 				case AssetViewerInfo.ClickType.CLICK:
 					{
@@ -241,9 +247,7 @@ namespace FrameworkEditor
 						//	reset all serach / selected non-sense
 						ResetViewDirectories();
 
-						//	clear out the search field
-						_clearSearchText = true;
-						_currentSearchText = string.Empty;
+						_searchBar.Clear();
 
 						//	go through and select the correct directory
 						for(int a = 0; a < _viewerDirectories.Count; ++a)
@@ -310,55 +314,9 @@ namespace FrameworkEditor
 				});	
 		}
 
-		/// <summary>
-		/// Renders the search area, and handles initial logic to switch directories to searched.
-		/// </summary>
-		private void RenderSearchArea()
+		private void SearchChanged()
 		{
-			_searchTextChanged = false;
-
-			//	mimic Unitys search bar as close as possible
-			GUILayout.BeginHorizontal(GUI.skin.FindStyle("Toolbar"));
-			GUI.SetNextControlName("SearchToolBarField");
-			_currentSearchText = GUILayout.TextField(_currentSearchText, GUI.skin.FindStyle("ToolbarSeachTextField"));
-			if(GUILayout.Button(string.Empty, GUI.skin.FindStyle("ToolbarSeachCancelButton")))
-			{
-				_currentSearchText = string.Empty;
-				GUI.FocusControl(null);
-			}
-			GUILayout.EndHorizontal();
-
-			//	check to see if the search text has changed
-			//	if it has reset all search results
-			if(_currentSearchText != _searchText && _clearSearchText == false)
-			{
-				_searchTextChanged = true;
-				ResetViewDirectories();
-			}
-
-			_searchText = _currentSearchText;
-			_clearSearchText = false;
-
-			//	check to see if we found any search results
-			if(string.IsNullOrEmpty(_currentSearchText) == false && _searchTextChanged == true)
-			{
-				//	we make sure every thing is lower case to ignore any case sensitivity issues
-				string toLowerSearch = _currentSearchText.ToLower();
-
-				for(int i = 0; i < _viewerDirectories.Count; ++i)
-				{
-					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
-					{
-						string directoryName = _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name.ToLower();
-
-						if(directoryName.Contains(toLowerSearch))
-						{
-							_viewerDirectories[i].IsSearched = true;
-							_viewerDirectories[i].AssetInfo[j].IsSearched = true;
-						}
-					}
-				}
-			}
+			ResetViewDirectories();
 		}
 
 		/// <summary>
@@ -441,6 +399,34 @@ namespace FrameworkEditor
 				}
 			}
 			_removedDirectories.Clear();
+
+			//	we make sure every thing is lower case to ignore any case sensitivity issues
+			string toLowerSearch = _searchBar.SearchText.ToLower();
+
+			if(!string.IsNullOrEmpty(toLowerSearch))
+			{
+				bool resetFocusControl = false;
+
+				for(int i = 0; i < _viewerDirectories.Count; ++i)
+				{
+					for(int j = 0; j < _viewerDirectories[i].AssetInfo.Count; ++j)
+					{
+						string directoryName = _viewerDirectories[i].AssetInfo[j].FileSystemInfo.Name.ToLower();
+
+						if(directoryName.Contains(toLowerSearch))
+						{
+							_viewerDirectories[i].IsSearched = true;
+							_viewerDirectories[i].AssetInfo[j].IsSearched = true;
+							resetFocusControl = true;
+						}
+					}
+				}
+
+				if(resetFocusControl) 
+				{
+					GUI.FocusControl(_searchBar.ControlName);
+				}
+			}
 
 			//	update all the ViewerDirectories!
 			if(updated)

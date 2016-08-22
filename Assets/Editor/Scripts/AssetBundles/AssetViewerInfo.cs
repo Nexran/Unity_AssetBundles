@@ -59,7 +59,7 @@ public class AssetViewerInfo
 		}
 	}
 
-	public AssetViewerInfo.ClickType Click(Vector2 mousePosition, out string folderName)
+	public AssetViewerInfo.ClickType Click(EventType eventType, int clickCount, Vector2 mousePosition, out string folderName)
 	{
 		AssetViewerInfo.ClickType clickType = ClickType.NONE;
 		folderName = string.Empty;
@@ -73,7 +73,7 @@ public class AssetViewerInfo
 
 			//	 a user double clicks on the folder 
 			//	select the folder and expand the folder to mimic project folder hierarchy
-			if(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2)
+			if(eventType == EventType.MouseDown && clickCount == 2)
 			{
 				//	if there is no file extension which means its a folder expand it! 
 				if(CanExplore)

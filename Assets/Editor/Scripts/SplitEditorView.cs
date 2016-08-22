@@ -9,7 +9,7 @@ namespace FrameworkEditor
 	/// </summary>
 	public class SplitEditorView : BaseEditorView
 	{
-		protected enum SplitType
+		public enum SplitType
 		{
 			HORIZONTAL,
 			VERTICAL
@@ -26,12 +26,17 @@ namespace FrameworkEditor
 		private Rect _dividerRect;
 		private Rect _windowRect;
 
-		protected EventType _eventType;
-		protected Vector2 _mousePosition;
-		protected int _clickCount;
+		private EventType _eventType;
+		private Vector2 _mousePosition;
+		private int _clickCount;
 
-		protected float _currentViewSize;
-		protected SplitType _splitType;
+		private float _currentViewSize;
+		private SplitType _splitType;
+
+		public SplitType SplitViewType 
+		{ 
+			get { return _splitType; } 
+		}
 
 		/// <summary>
 		/// Unity function OnEnable, called when the window gets initialized. 
@@ -75,14 +80,14 @@ namespace FrameworkEditor
 			{
 				_viewOneScroll = GUILayout.BeginScrollView(_viewOneScroll, false, false, GUILayout.Width(_currentViewSize));
 			}
-			RenderViewOne();
+			RenderViewOne(_currentViewSize);
 			GUILayout.EndScrollView();
 
 			RenderDivider();
 
 			//	view Two
 			_viewTwoScroll = GUILayout.BeginScrollView(_viewTwoScroll);
-			RenderViewTwo();
+			RenderViewTwo(_currentViewSize);
 			GUILayout.EndScrollView();
 
 			if(_splitType == SplitType.VERTICAL)
@@ -104,8 +109,8 @@ namespace FrameworkEditor
 
 			if(_eventType == EventType.MouseDown)
 			{
-				HandleInputViewOne(_mousePosition + _viewOneScroll);
-				HandleInputViewTwo(_mousePosition + _viewTwoScroll);
+				HandleInputViewOne(_mousePosition + _viewOneScroll, _eventType, _clickCount);
+				HandleInputViewTwo(_mousePosition + _viewTwoScroll, _eventType, _clickCount);
 			}
 		}
 
@@ -125,24 +130,29 @@ namespace FrameworkEditor
 			}
 		}
 
-		internal virtual void RenderViewOne()
+		internal virtual void RenderViewOne(float viewSize)
 		{
 
 		}
 
-		internal virtual void RenderViewTwo()
+		internal virtual void RenderViewTwo(float viewSize)
 		{
 
 		}
 
-		internal virtual void HandleInputViewOne(Vector2 mousePosition)
+		internal virtual void HandleInputViewOne(Vector2 mousePosition, EventType eventType, int clickCount)
 		{
 
 		}
 
-		internal virtual void HandleInputViewTwo(Vector2 mousePosition)
+		internal virtual void HandleInputViewTwo(Vector2 mousePosition, EventType eventType, int clickCount)
 		{
 
+		}
+
+		protected void SetSplitViewType(SplitType splitType)
+		{
+			_splitType = splitType;
 		}
 
 		/// <summary>
@@ -209,7 +219,6 @@ namespace FrameworkEditor
 					_dividerRect.Set(_currentViewSize, _dividerRect.y, _dividerRect.width, _dividerRect.height);
 				}
 			}
-
 		}
 	}
 }
